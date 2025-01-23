@@ -1,0 +1,5 @@
+CREATE TABLE images (
+    id INT NOT NULL AUTO_INCREMENT,
+    image_data LONGBLOB NOT NULL,
+    PRIMARY KEY (id)
+);
