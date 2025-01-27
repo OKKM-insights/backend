@@ -4,7 +4,7 @@ from flask import Flask, Response, request
 import json
 
 
-class FlaskServer():
+class LabelServer():
 
     def __init__(self, db: LabelDatabaseConnector):
         self.version = '1.0'
@@ -21,8 +21,7 @@ class FlaskServer():
         )
         self.app.run()
 
-        
-
+       
 
     def push_label(self) -> Response:
         '''
@@ -35,10 +34,18 @@ class FlaskServer():
         
         request_headers = request.headers
 
-        label = Label(LabellerID=request_data['LabellerID'], 
+        label = Label(LabelID=None,
+                      LabellerID=request_data['LabellerID'], 
                       ImageID=request_data['ImageID'],
-                      RelatedPixels=request_data['RelatedPixels'],
-                      Class=request_data['Class'])
+                      Class=request_data['Class'],
+                      bot_right_x=request_data['bot_right_x'],
+                      bot_right_y=request_data['bot_right_y'],
+                      top_left_x=request_data['top_left_x'],
+                      top_left_y=request_data['top_left_y'],
+                      offset_x=request_data['offset_x'],
+                      offset_y=request_data['offset_y'],
+                      creation_time=request_data['creation_time']
+                      )
         try:
             self.db.push_label(label=label)
 
@@ -51,4 +58,6 @@ class FlaskServer():
             return Response(status=400, response=str(e))
         
         return Response(status=200)
-        
+
+db = MYSQLLabelDatabaseConnector()
+server = LabelServer(db)
