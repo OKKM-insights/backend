@@ -1,5 +1,5 @@
 from LabelDatabaseConnector import LabelDatabaseConnector, MYSQLLabelDatabaseConnector
-from Label import Label
+from services.DataTypes import Label
 from flask import Flask, Response, request
 import json
 
