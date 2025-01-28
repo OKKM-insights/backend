@@ -5,12 +5,14 @@ from flask_cors import CORS
 
 # modules
 from api.image_routes import image_blueprint
+from api.account_routes import user_project_blueprint
 
 
 def create_app():
     app = Flask(__name__)
-    CORS(app, resources={r"/api/*": {"origins": "https://orbitwatch.xyz"}})
+    CORS(app, resources={r"/api/*": {"origins": ["https://orbitwatch.xyz", "http://localhost:3000"]}})
     app.register_blueprint(image_blueprint)
+    app.register_blueprint(user_project_blueprint)
     return app
 
 app = create_app()
