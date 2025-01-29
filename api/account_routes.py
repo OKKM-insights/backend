@@ -1,4 +1,5 @@
 import os
+import base64
 from flask import Blueprint, request, jsonify
 from services.core_img_db_connector import get_db_connection
 from mysql.connector import Error
@@ -91,3 +92,70 @@ def create_project():
     finally:
         cursor.close()
         connection.close()
+
+@user_project_blueprint.route('/api/login', methods=['POST'])
+def login_user():
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        password = data.get('password')
+
+        if not email or not password:
+            return jsonify({'error': 'Email and password are required'}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)  # Use dictionary cursor to return rows as dictionaries
+
+        # Fetch user details
+        user_query = """
+            SELECT id, email, user_type, profile_picture 
+            FROM Users 
+            WHERE email = %s AND password = %s
+        """
+        cursor.execute(user_query, (email, password))
+        user = cursor.fetchone()
+
+        if not user:
+            return jsonify({'error': 'Invalid credentials'}), 401
+
+        user_id = user['id']
+        user_type = user['user_type']
+        user_info = {
+            'id': user_id,
+            'email': user['email'],
+            'user_type': user_type,
+            'profile_picture': base64.b64encode(user['profile_picture']).decode('utf-8') if user['profile_picture'] else None
+        }
+
+        # Fetch client or labeler info based on user_type
+        if user_type == 'client':
+            client_query = """
+                SELECT name AS company_name, industry, typical_projects
+                FROM Clients
+                WHERE user_id = %s
+            """
+            cursor.execute(client_query, (user_id,))
+            client_info = cursor.fetchone()
+            user_info['client_info'] = client_info
+
+        elif user_type == 'labeller':
+            labeler_query = """
+                SELECT first_name, last_name, skills, availability
+                FROM Labellers
+                WHERE user_id = %s
+            """
+            cursor.execute(labeler_query, (user_id,))
+            labeler_info = cursor.fetchone()
+            user_info['labeler_info'] = labeler_info
+
+        return jsonify({'user': user_info}), 200
+
+    except Error as e:
+        print(str(e))
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
