@@ -22,13 +22,6 @@ def register_user():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        user_query = """
-            INSERT INTO Users (email, password, profile_picture, user_type)
-            VALUES (%s, %s, %s, %s)
-            """
-        cursor.execute(user_query, (email, password, profile_picture_blob, user_type))
-        user_id = cursor.lastrowid
-
         # Insert into Clients or Labellers table based on user_type
         if user_type == 'client':
             name = data.get('company_name')
@@ -36,22 +29,22 @@ def register_user():
             typical_projects = data.get('typical_proj')
 
             client_query = """
-            INSERT INTO Clients (user_id, name, industry, typical_projects)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO Clients (email, password, profile_picture, name, industry, typical_projects)
+            VALUES (%s, %s, %s, %s, %s, %s)
             """
-            cursor.execute(client_query, (user_id, name, industry, typical_projects))
+            cursor.execute(client_query, (email, password, profile_picture_blob, name, industry, typical_projects))
 
-        elif user_type == 'labeler':
+        elif user_type == 'labeller':
             first_name = data.get('first_name')
             last_name = data.get('last_name')
             skills = data.get('skills')
             availability = data.get('availability')
 
             labeller_query = """
-            INSERT INTO Labellers (user_id, first_name, last_name, skills, availability)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO Labellers (email, password, profile_picture, first_name, last_name, skills, availability)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             """
-            cursor.execute(labeller_query, (user_id, first_name, last_name, skills, availability))
+            cursor.execute(labeller_query, (email, password, profile_picture_blob, first_name, last_name, skills, availability))
 
         # Commit the transaction
         conn.commit()
@@ -99,54 +92,55 @@ def login_user():
         data = request.get_json()
         email = data.get('email')
         password = data.get('password')
+        user_type = data.get('userType')
 
-        if not email or not password:
-            return jsonify({'error': 'Email and password are required'}), 400
+        if not email or not password or not user_type:
+            return jsonify({'error': 'Email, password, and user_type are required'}), 400
 
         conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)  # Use dictionary cursor to return rows as dictionaries
+        cursor = conn.cursor(dictionary=True)
 
-        # Fetch user details
-        user_query = """
-            SELECT id, email, user_type, profile_picture 
-            FROM Users 
-            WHERE email = %s AND password = %s
-        """
-        cursor.execute(user_query, (email, password))
+        # Determine which table to query based on user_type
+        if user_type == 'client':
+            query = """
+                SELECT id, email, profile_picture, name AS company_name, industry, typical_projects
+                FROM Clients
+                WHERE email = %s AND password = %s
+            """
+        elif user_type == 'labeller':
+            query = """
+                SELECT id, email, profile_picture, first_name, last_name, skills, availability
+                FROM Labellers
+                WHERE email = %s AND password = %s
+            """
+        else:
+            return jsonify({'error': 'Invalid user_type'}), 400
+
+        cursor.execute(query, (email, password))
         user = cursor.fetchone()
 
         if not user:
             return jsonify({'error': 'Invalid credentials'}), 401
 
-        user_id = user['id']
-        user_type = user['user_type']
         user_info = {
-            'id': user_id,
-            'email': user['email'],
-            'user_type': user_type,
+            'id': user['id'],
+            'email': user['email'], 
             'profile_picture': base64.b64encode(user['profile_picture']).decode('utf-8') if user['profile_picture'] else None
         }
 
-        # Fetch client or labeler info based on user_type
         if user_type == 'client':
-            client_query = """
-                SELECT name AS company_name, industry, typical_projects
-                FROM Clients
-                WHERE user_id = %s
-            """
-            cursor.execute(client_query, (user_id,))
-            client_info = cursor.fetchone()
-            user_info['client_info'] = client_info
-
+            user_info.update({
+                'company_name': user['company_name'],
+                'industry': user['industry'],
+                'typical_projects': user['typical_projects']
+            })
         elif user_type == 'labeller':
-            labeler_query = """
-                SELECT first_name, last_name, skills, availability
-                FROM Labellers
-                WHERE user_id = %s
-            """
-            cursor.execute(labeler_query, (user_id,))
-            labeler_info = cursor.fetchone()
-            user_info['labeler_info'] = labeler_info
+            user_info.update({
+                'first_name': user['first_name'],
+                'last_name': user['last_name'],
+                'skills': user['skills'],
+                'availability': user['availability']
+            })
 
         return jsonify({'user': user_info}), 200
 
