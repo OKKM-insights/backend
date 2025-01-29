@@ -3,6 +3,7 @@ import base64
 from flask import Blueprint, request, jsonify
 from services.core_img_db_connector import get_db_connection
 from mysql.connector import Error
+from datetime import date
 
 user_project_blueprint = Blueprint('user_project_routes', __name__)
 
@@ -61,30 +62,49 @@ def register_user():
 
 @user_project_blueprint.route('/api/create_project', methods=['POST'])
 def create_project():
-    data = request.get_json()
-    user_id = data.get('user_id')  # Assuming the user ID is provided
-    project_name = data.get('project_name')
-    description = data.get('description')
-
-    if not (user_id and project_name and description):
-        return jsonify({'error': 'Missing required fields'}), 400
-
-    connection = get_db_connection()
-    cursor = connection.cursor()
-
     try:
-        cursor.execute(
-            "INSERT INTO projects (user_id, project_name, description) VALUES (%s, %s, %s)",
-            (user_id, project_name, description)
-        )
-        connection.commit()
-        return jsonify({'message': 'Project created successfully'}), 201
-    except Exception as e:
-        connection.rollback()
-        return jsonify({'error': str(e)}), 500
+        print(request.form)
+        client_id = request.form.get('client-id')
+        project_name = request.form.get('project-name')
+        project_description = request.form.get('project-description')
+        end_date = request.form.get('end-date')
+        analysis_goal = request.form.get('analysis-goal')
+        image = request.files.get('image-upload')
+
+        if not client_id or not project_name or not end_date or not image:
+            return jsonify({'error': 'Missing required fields'}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Insert into Projects table
+        project_query = """
+            INSERT INTO Projects (clientId, name, description, endDate, categories) 
+            VALUES (%s, %s, %s, %s, %s)
+        """
+        cursor.execute(project_query, (client_id, project_name, project_description, end_date, analysis_goal))
+        project_id = cursor.lastrowid
+
+        image_data = image.read()
+        image_query = """
+            INSERT INTO OriginalImages (projectId, image) 
+            VALUES (%s, %s)
+        """
+        cursor.execute(image_query, (project_id, image_data))
+
+        conn.commit()
+
+        return jsonify({'message': 'Project created successfully', 'project_id': project_id}), 200
+
+    except Error as e:
+        print(str(e))
+        return jsonify({"error": str(e)}), 500
+
     finally:
-        cursor.close()
-        connection.close()
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 @user_project_blueprint.route('/api/login', methods=['POST'])
 def login_user():
@@ -153,3 +173,28 @@ def login_user():
             cursor.close()
         if conn:
             conn.close()
+
+@user_project_blueprint.route('/api/projects', methods=['GET'])
+def get_projects():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        today = date.today()
+
+        query = """
+        SELECT projectId AS id, name AS title, description 
+        FROM Projects 
+        WHERE endDate >= %s
+        """
+        cursor.execute(query, (today,))
+        projects = cursor.fetchall()
+
+        return jsonify({"projects": projects}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        cursor.close()
+        conn.close()
