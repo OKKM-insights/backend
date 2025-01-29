@@ -4,6 +4,8 @@ from flask import Blueprint, request, jsonify
 from services.core_img_db_connector import get_db_connection
 from mysql.connector import Error
 from datetime import date
+from PIL import Image
+import io
 
 user_project_blueprint = Blueprint('user_project_routes', __name__)
 
@@ -91,6 +93,30 @@ def create_project():
             VALUES (%s, %s)
         """
         cursor.execute(image_query, (project_id, image_data))
+
+        # Very rough preprocessing
+        img = Image.open(io.BytesIO(image_data))
+        img_width, img_height = img.size
+        tile_size = 300
+
+        for y_offset in range(0, img_height, tile_size):
+            for x_offset in range(0, img_width, tile_size):
+                # Ensure we don't go beyond the image boundary
+                box = (x_offset, y_offset, min(x_offset + tile_size, img_width), min(y_offset + tile_size, img_height))
+                tile = img.crop(box)
+
+                # Convert the tile to a blob (byte data)
+                img_byte_arr = io.BytesIO()
+                tile.save(img_byte_arr, format='PNG')
+                img_blob = img_byte_arr.getvalue()
+
+                # Insert the tile into the Images table
+                insert_tile_query = """
+                    INSERT INTO Images (project_id, image_width, image_height, x_offset, y_offset, image)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """
+                cursor.execute(insert_tile_query, (project_id, tile_size, tile_size, x_offset, y_offset, img_blob))
+
 
         conn.commit()
 
@@ -191,6 +217,74 @@ def get_projects():
         projects = cursor.fetchall()
 
         return jsonify({"projects": projects}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        cursor.close()
+        conn.close()
+
+@user_project_blueprint.route('/api/getImages', methods=['GET'])
+def get_images():
+    try:
+        # Get query parameters
+        project_id = request.args.get('projectId')
+        limit = request.args.get('limit', default=10, type=int)
+        offset = request.args.get('offset', default=0, type=int)
+
+        if not project_id:
+            return jsonify({"error": "Missing projectId parameter"}), 400
+
+        # Convert project_id to an integer (if it's not already)
+        project_id = int(project_id)
+
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        query = """
+        SELECT id, project_id, image_width, image_height, x_offset, y_offset, image
+        FROM Images
+        WHERE project_id = %s
+        LIMIT %s OFFSET %s
+        """
+        cursor.execute(query, (project_id, limit, offset))
+        images = cursor.fetchall()
+
+        for image in images:
+            image['image'] = base64.b64encode(image['image']).decode('utf-8')
+
+        return jsonify({"images": images}), 200
+
+    except Exception as e:
+        print(str(e))
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        cursor.close()
+        conn.close()
+
+@user_project_blueprint.route('/api/project/<int:project_id>', methods=['GET'])
+def get_project_categories(project_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        # Query to get categories from the Projects table
+        query = """
+        SELECT categories
+        FROM Projects
+        WHERE projectId = %s
+        """
+        cursor.execute(query, (project_id,))
+        project = cursor.fetchone()
+
+        if not project:
+            return jsonify({"error": "Project not found"}), 404
+
+        # Assuming categories is stored as a comma-separated string
+        categories = project['categories']
+        return jsonify({"categories": categories}), 200
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
