@@ -28,36 +28,40 @@ class LabelServer():
         save map modifications to table in database
         '''
         try:
-            request_data = request.json
-        except:
+            request_data = request.get_json(force=True)
+            
+        except Exception as e:
+            print(e)
             return Response(status=400, response='couldn\'t extract json')
         
         request_headers = request.headers
 
-        label = Label(LabelID=None,
-                      LabellerID=request_data['LabellerID'], 
-                      ImageID=request_data['ImageID'],
-                      Class=request_data['Class'],
-                      bot_right_x=request_data['bot_right_x'],
-                      bot_right_y=request_data['bot_right_y'],
-                      top_left_x=request_data['top_left_x'],
-                      top_left_y=request_data['top_left_y'],
-                      offset_x=request_data['offset_x'],
-                      offset_y=request_data['offset_y'],
-                      creation_time=request_data['creation_time']
-                      )
+        
         try:
-            self.db.push_label(label=label)
+            for req in request_data['labels']:
+                label = Label(LabelID=None,
+                        LabellerID=req['LabellerID'], 
+                        ImageID=req['ImageID'],
+                        Class=req['Class'],
+                        bot_right_x=req['bot_right_x'],
+                        bot_right_y=req['bot_right_y'],
+                        top_left_x=req['top_left_x'],
+                        top_left_y=req['top_left_y'],
+                        offset_x=req['offset_x'],
+                        offset_y=req['offset_y'],
+                        creation_time=req['creation_time']
+                        )
+                self.db.push_label(label=label)
 
         except ValueError as e:
             return Response(status=400, response=str(e))
         except KeyError as e:
             return Response(status=400, response=str(e))
-        except:
+        except Exception as e:
             print("other Error")
             return Response(status=400, response=str(e))
         
-        return Response(status=200)
+        return Response(status=200, response='all labels saved')
 
 db = MYSQLLabelDatabaseConnector()
 server = LabelServer(db)
