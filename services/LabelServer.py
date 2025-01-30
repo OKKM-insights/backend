@@ -1,6 +1,7 @@
 from LabelDatabaseConnector import LabelDatabaseConnector, MYSQLLabelDatabaseConnector
 from services.DataTypes import Label
 from flask import Flask, Response, request
+from flask_cors import CORS, cross_origin
 import json
 
 
@@ -11,7 +12,7 @@ class LabelServer():
 
         self.db = db
         self.app = Flask(__name__)
-
+        CORS(self.app)
 
         self.app.add_url_rule(
             rule=f'/{self.version}/push_label'
