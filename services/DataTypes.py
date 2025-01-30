@@ -1,5 +1,5 @@
 import uuid
-
+from PIL import Image as pilImage
 
 class Label():
     LabelID: str
@@ -46,23 +46,14 @@ class Label():
 
 
 class Labeller():
-    LabellerID: str
     UserID: str
     last_label_time: str
     skills: dict[str, tuple[float, float]]
 
     def __init__(self,
-                LabellerID: str=None,
                 UserID: str= None,
                 last_label_time: str=None,
                 skills: dict[str, tuple[float, float]]=None):
-        '''
-        If making a new Labeller object (not loading from database), set ID to None
-        '''
-        if not LabellerID:
-            self.LabellerID = str(uuid.uuid4())
-        else:
-            self.LabelID = LabellerID
 
         if not skills:
             self.skills = dict()
@@ -71,3 +62,48 @@ class Labeller():
 
         self.UserID = UserID
         self.last_label_time = last_label_time        
+
+
+class ImageObject():
+    ImageObjectID: str
+    ImageID: str
+    Class: str
+    confidence: float
+    related_pixels: list[int]
+    related_labels: list[Label]
+    
+    def __init__(self,
+                 ImageObjectID:str = None,
+                 ImageID:str = None,
+                 Class: str = None,
+                 confidence: float = None,
+                 related_pixels: list[int] = None,
+                 related_labels: list[Label] = None,):
+        if not ImageObjectID:
+            self.ImageObjectID = str(uuid.uuid4())
+        else:
+            self.ImageObjectID = ImageObjectID
+
+        if not related_pixels:
+            self.related_pixels = []
+        else:
+            self.related_pixels = related_pixels
+
+        if not related_labels:
+            self.related_labels = []
+        else:
+            self.related_labels = related_labels
+
+        self.ImageID = ImageID
+        self.Class = Class
+        self.confidence = confidence
+
+
+class Image():
+    ImageID: str
+    ProjectID: str
+    width: int
+    height: int
+    image_data: pilImage
+
+    
