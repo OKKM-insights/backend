@@ -68,15 +68,15 @@ class ImageObject():
     ImageObjectID: str
     ImageID: str
     Class: str
-    confidence: float
-    related_pixels: list[int]
+    Confidence: float
+    related_pixels: list[list[int, int]]
     related_labels: list[Label]
     
     def __init__(self,
                  ImageObjectID:str = None,
                  ImageID:str = None,
                  Class: str = None,
-                 confidence: float = None,
+                 Confidence: float = None,
                  related_pixels: list[int] = None,
                  related_labels: list[Label] = None,):
         if not ImageObjectID:
@@ -96,7 +96,7 @@ class ImageObject():
 
         self.ImageID = ImageID
         self.Class = Class
-        self.confidence = confidence
+        self.Confidence = Confidence
 
 
 class Image():
