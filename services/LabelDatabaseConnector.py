@@ -70,6 +70,7 @@ class MYSQLLabelDatabaseConnector(LabelDatabaseConnector):
 
 
     def push_label(self, label:Label):
+        self.make_db_connection()
         with self.cnx.connect() as connection:
             try:
                 result = connection.execute(
@@ -92,6 +93,7 @@ class MYSQLLabelDatabaseConnector(LabelDatabaseConnector):
                 raise Exception(e)
 
     def get_labels(self, query:str) -> list[Label]:
+        self.make_db_connection()
         results = []
         with self.cnx.connect() as connection:
             try:
