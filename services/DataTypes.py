@@ -46,22 +46,22 @@ class Label():
 
 
 class Labeller():
-    UserID: str
-    last_label_time: str
-    skills: dict[str, tuple[float, float]]
+    LabellerID: str
+    skills: str
+    alpha: float
+    beta: float
 
     def __init__(self,
-                UserID: str= None,
-                last_label_time: str=None,
-                skills: dict[str, tuple[float, float]]=None):
+                LabellerID: str= None,
+                skill: str=None,
+                alpha: float=1.2,
+                beta: float=1):
 
-        if not skills:
-            self.skills = dict()
-        else:
-            self.skills = skills
-
-        self.UserID = UserID
-        self.last_label_time = last_label_time        
+        self.LabellerID = LabellerID
+        self.skill = skill
+        self.alpha = alpha
+        self.beta = beta
+      
 
 
 class ImageObject():
@@ -102,8 +102,26 @@ class ImageObject():
 class Image():
     ImageID: str
     ProjectID: str
-    width: int
-    height: int
+    # width: int
+    # height: int
     image_data: pilImage
 
-    
+    def __init__(self, ImageID: str, ProjectID: str, image_data: pilImage):
+        self.ImageID = ImageID
+        self.ProjectID = ProjectID
+        # self.width = width
+        # self.height = height
+        self.image_data = image_data
+
+
+class Project():
+    ProjectID: str
+    classes: list[str]
+    images: list[Image]
+
+    def __init__(self, ProjectID: str, classes: list[str], images: list[Image]):
+        self.ProjectID = ProjectID
+        self.classes = classes
+        self.images = images
+
+

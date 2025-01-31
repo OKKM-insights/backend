@@ -6,7 +6,7 @@ import uuid
 import time
 import datetime
 import json
-from services.DataTypes import Labeller
+from DataTypes import Labeller
 import urllib.parse
 import pymysql
 
@@ -41,7 +41,7 @@ class NoneDB(LabellerDatabaseConnector):
 
 class MYSQLLabellerDatabaseConnector(LabellerDatabaseConnector):
 
-    def __init__(self, table:str='Labellers'):
+    def __init__(self, table:str='Labeller_skills'):
         self.cnx = None
         self.make_db_connection()
         self.table=table
@@ -70,21 +70,26 @@ class MYSQLLabellerDatabaseConnector(LabellerDatabaseConnector):
 
 
     def push_labeller(self, labeller:Labeller):
+
+        query = text("""
+            INSERT INTO Labeller_skills (Labeller_id, skill, alpha, beta) 
+            VALUES (:labeller_id, :skill, :alpha, :beta)
+            ON DUPLICATE KEY UPDATE 
+            alpha = VALUES(alpha), 
+            beta = VALUES(beta);
+        """)
+
+
         with self.cnx.connect() as connection:
             try:
-                result = connection.execute(
-                    text(f"""INSERT INTO {self.table} VALUES { labeller.LabellerID,
-                                                               label.LabellerID, 
-                                                               label.ImageID,
-                                                               label.Class,
-                                                               label.top_left_x,
-                                                               label.top_left_y,
-                                                               label.bot_right_x,
-                                                               label.bot_right_y,
-                                                               label.offset_x,
-                                                               label.offset_y,
-                                                               label.creation_time}""")
-                )
+                data = {
+                    "labeller_id": labeller.LabellerID,
+                    "skill": labeller.skill,
+                    "alpha": labeller.alpha,
+                    "beta": labeller.beta,
+                }
+                connection.execute(query, data)
+
                 connection.commit()
                 print(f"Query sucessful")
             except Exception as e:
@@ -92,36 +97,29 @@ class MYSQLLabellerDatabaseConnector(LabellerDatabaseConnector):
                 raise Exception(e)
 
     def get_labellers(self, query:str) -> list[Labeller]:
+        # query should be something like 'where id = x' or 'where skill = 'x''
         results = []
         with self.cnx.connect() as connection:
             try:
                 result = connection.execute(text(query))
-                print(f"Query returned {result.rowcount} results")
+                print(f"Query returned {result.rowcount} results") 
                 for res in result:
-                    l = Label(
-                        LabelID=res[0],
-                        LabellerID=res[1],
-                        ImageID=res[2],
-                        Class=res[4],
-                        top_left_x=res[5],
-                        top_left_y=res[6],
-                        bot_right_x=res[7],
-                        bot_right_y=res[8],
-                        offset_x=res[9],
-                        offset_y=res[10]
-                    )
-                    results.append(l)
+                    results.append(Labeller(res[0], res[1], res[2], res[3]))
                 return results
             except Exception as e:
                 print("Error {e}")
                 raise Exception(e)
             
+    
+            
 
     
-# LD = MYSQLLabelDatabaseConnector()       
+LD = MYSQLLabellerDatabaseConnector()       
 
-# l = Label(
-#     None, 1,1,"test", 34,34,64,64,0,0,1010
-# )
-# LD.push_label(l)
-# print(LD.get_labels("SELECT * FROM my_image_db.Labels;"))
+l = Labeller(LabellerID='1', skill = 'plane', alpha=1.1, beta=1)
+
+
+print(l.LabellerID)
+print(l.skill)
+LD.push_labeller(l)
+print(LD.get_labellers("SELECT * FROM my_image_db.Labeller_skills;"))
