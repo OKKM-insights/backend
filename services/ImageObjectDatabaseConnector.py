@@ -122,7 +122,7 @@ class MYSQLImageObjectDatabaseConnector(ImageObjectDatabaseConnector):
                 raise Exception(e)
 
     def get_imageobjects(self, query:str) -> list[ImageObject]:
-
+        self.make_db_connection()
 
         ImageObjects = []
         ImageObjectIDs = []
@@ -171,6 +171,7 @@ class MYSQLImageObjectDatabaseConnector(ImageObjectDatabaseConnector):
             
     
     def get_labels(self, query:str, data) -> list[Label]:
+        self.make_db_connection()
         results = []
         with self.cnx.connect() as connection:
             try:

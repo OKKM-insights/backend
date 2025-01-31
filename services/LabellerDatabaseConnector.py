@@ -70,7 +70,7 @@ class MYSQLLabellerDatabaseConnector(LabellerDatabaseConnector):
 
 
     def push_labeller(self, labeller:Labeller):
-
+        self.make_db_connection()
         query = text("""
             INSERT INTO Labeller_skills (Labeller_id, skill, alpha, beta) 
             VALUES (:labeller_id, :skill, :alpha, :beta)
@@ -97,6 +97,7 @@ class MYSQLLabellerDatabaseConnector(LabellerDatabaseConnector):
                 raise Exception(e)
 
     def get_labellers(self, query:str) -> list[Labeller]:
+        self.make_db_connection()
         # query should be something like 'where id = x' or 'where skill = 'x''
         results = []
         with self.cnx.connect() as connection:

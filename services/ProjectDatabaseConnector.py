@@ -42,6 +42,7 @@ class MYSQLProjectDatabaseConnector(ProjectDatabaseConnector):
         self.table=table
 
     def make_db_connection(self):
+        
         load_dotenv()
         MYSQLUSER=os.getenv('_LABELDATABASE_MYSQLUSER')
         MYSQLPASSWORD=os.getenv('_LABELDATABASE_MYSQLPASSWORD')
@@ -66,6 +67,7 @@ class MYSQLProjectDatabaseConnector(ProjectDatabaseConnector):
 
     def get_projects(self, query:str) -> list[Project]:
         # query should be something like 'where id = x' or 'where skill = 'x''
+        self.make_db_connection()
         projects = []
         project_ids = []
         categories = []
