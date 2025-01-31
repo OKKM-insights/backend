@@ -79,12 +79,12 @@ class MYSQLImageObjectDatabaseConnector(ImageObjectDatabaseConnector):
         """)
 
         query_related_pixels = text("""
-            INSERT INTO Pixels_in_ImageObject (ImageObjectID, x, y) 
+            INSERT IGNORE INTO Pixels_in_ImageObject (ImageObjectID, x, y) 
             VALUES (:ImageObjectID, :x, :y);
         """)
 
         query_related_labels = text("""
-            INSERT INTO Labels_ImageObjects (ImageObjectID, LabelID) 
+            INSERT IGNORE INTO Labels_ImageObjects (ImageObjectID, LabelID) 
             VALUES (:ImageObjectID, :LabelID);
         """)
 
@@ -122,27 +122,86 @@ class MYSQLImageObjectDatabaseConnector(ImageObjectDatabaseConnector):
                 raise Exception(e)
 
     def get_imageobjects(self, query:str) -> list[ImageObject]:
-        # query should be something like 'where id = x' or 'where skill = 'x''
-        results = []
+
+
+        ImageObjects = []
+        ImageObjectIDs = []
+        ImageIDs= []
+        Classes = []
+        Confidences = []
         with self.cnx.connect() as connection:
             try:
                 result = connection.execute(text(query))
                 print(f"Query returned {result.rowcount} results") 
                 for res in result:
-                    results.append(ImageObject(res[0], res[1], res[2], res[3]))
-                return results
+                    ImageObjectIDs.append(res[0])
+                    ImageIDs.append(res[1])
+                    Classes.append(res[2])
+                    Confidences.append(res[3])
             except Exception as e:
                 print("Error {e}")
                 raise Exception(e)
             
-    
+            print(ImageObjectIDs)
+
+            # --- get label ids and ---
+
+            query_label_ids = text("""
+                                SELECT * FROM Labels WHERE LabelID in 
+                                (SELECT LabelID FROM my_image_db.Labels_ImageObjects WHERE ImageObjectID = :imageobjectid);
+                                   """)
+            query_pixels = text("""SELECT x,y FROM Pixels_in_ImageObject WHERE ImageObjectID = :imageobjectid;
+                                """)
+
+            try:
+                for i , id in enumerate(ImageObjectIDs):
+                    data = {"imageobjectid": id}
+                    labels = self.get_labels(query_label_ids, data)
+                    pixels = []
+                    result = connection.execute(query_pixels, data)
+                    for res in result:
+                        pixels.append([res[0], res[1]])
+                    ImageObjects.append(ImageObject(id, ImageIDs[i], Classes[i], Confidences[i], pixels.copy(), labels.copy()))
+            except Exception as e:
+                print("Error {e}")
+                raise Exception(e)
             
+        return ImageObjects
+            
+            
+    
+    def get_labels(self, query:str, data) -> list[Label]:
+        results = []
+        with self.cnx.connect() as connection:
+            try:
+                result = connection.execute(query, data)
+                print(f"Query returned {result.rowcount} results")
+                for res in result:
+                    l = Label(
+                        LabelID=res[0],
+                        LabellerID=res[1],
+                        ImageID=res[2],
+                        Class=res[4],
+                        top_left_x=res[5],
+                        top_left_y=res[6],
+                        bot_right_x=res[7],
+                        bot_right_y=res[8],
+                        offset_x=res[9],
+                        offset_y=res[10]
+                    )
+                    results.append(l)
+                return results
+            except Exception as e:
+                print("Error {e}")
+                raise Exception(e)        
 
     
 LD = MYSQLImageObjectDatabaseConnector()       
 
-l = Label('t','t','t','class',0,0,0,0,0,0,'0')
+l = Label('08500f1e-9eff-4d1a-8d9c-1f1d0a2a2bd6','t','t','class',0,0,0,0,0,0,'0')
 
 I = ImageObject('test', 't', 't', 0.1, [[0,0],[0,1],[0,2],[0,3]], [l])
 
 LD.push_imageobject(I)
+res = LD.get_imageobjects("SELECT * FROM ImageObjects;")
+print(res[0].related_labels)
