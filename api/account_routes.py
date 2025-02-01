@@ -204,17 +204,39 @@ def login_user():
 @user_project_blueprint.route('/api/projects', methods=['GET'])
 def get_projects():
     try:
+        user_id = request.args.get('userId')
+
+        if not user_id:
+            return jsonify({"error": "Missing userId parameter"}), 400
+
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
 
         today = date.today()
 
         query = """
-        SELECT projectId AS id, name AS title, description 
-        FROM Projects 
-        WHERE endDate >= %s
+        SELECT 
+            p.projectId AS id, 
+            p.name AS title, 
+            p.description, 
+            CEIL(IFNULL(labeled_count, 0) / IFNULL(total_images, 1) * 100) AS progress
+        FROM Projects p
+        LEFT JOIN (
+            SELECT i.project_id, COUNT(DISTINCT l.ImageID) AS labeled_count
+            FROM Labels l
+            JOIN Images i ON l.ImageID = i.id
+            WHERE l.LabellerID = %s
+            GROUP BY i.project_id
+        ) labeled ON p.projectId = labeled.project_id
+        LEFT JOIN (
+            SELECT project_id, COUNT(*) AS total_images
+            FROM Images
+            GROUP BY project_id
+        ) img_count ON p.projectId = img_count.project_id
+        WHERE p.endDate >= %s
         """
-        cursor.execute(query, (today,))
+
+        cursor.execute(query, (user_id, today))
         projects = cursor.fetchall()
 
         return jsonify({"projects": projects}), 200
@@ -229,27 +251,28 @@ def get_projects():
 @user_project_blueprint.route('/api/getImages', methods=['GET'])
 def get_images():
     try:
-        # Get query parameters
         project_id = request.args.get('projectId')
         limit = request.args.get('limit', default=10, type=int)
         offset = request.args.get('offset', default=0, type=int)
+        user_id = request.args.get('userId')
 
-        if not project_id:
-            return jsonify({"error": "Missing projectId parameter"}), 400
+        if not project_id or not user_id:
+            return jsonify({"error": "Missing projectId or userId parameter"}), 400
 
-        # Convert project_id to an integer (if it's not already)
         project_id = int(project_id)
+        user_id = int(user_id)
 
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
 
         query = """
-        SELECT *
-        FROM Images
-        WHERE project_id = %s
+        SELECT i.*
+        FROM Images i
+        LEFT JOIN Labels l ON i.id = l.ImageID AND l.LabellerID = %s
+        WHERE i.project_id = %s AND l.ImageID IS NULL
         LIMIT %s OFFSET %s
         """
-        cursor.execute(query, (project_id, limit, offset))
+        cursor.execute(query, (user_id, project_id, limit, offset))
         images = cursor.fetchall()
 
         for image in images:
