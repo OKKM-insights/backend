@@ -93,6 +93,7 @@ def create_project():
             VALUES (%s, %s)
         """
         cursor.execute(image_query, (project_id, image_data))
+        original_image_id = cursor.lastrowid
 
         # Very rough preprocessing
         img = Image.open(io.BytesIO(image_data))
@@ -112,10 +113,10 @@ def create_project():
 
                 # Insert the tile into the Images table
                 insert_tile_query = """
-                    INSERT INTO Images (project_id, image_width, image_height, x_offset, y_offset, image)
+                    INSERT INTO Images (project_id, original_image_id, image_width, image_height, x_offset, y_offset, image)
                     VALUES (%s, %s, %s, %s, %s, %s)
                 """
-                cursor.execute(insert_tile_query, (project_id, tile_size, tile_size, x_offset, y_offset, img_blob))
+                cursor.execute(insert_tile_query, (project_id, original_image_id, tile_size, tile_size, x_offset, y_offset, img_blob))
 
 
         conn.commit()
