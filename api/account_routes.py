@@ -244,7 +244,7 @@ def get_images():
         cursor = conn.cursor(dictionary=True)
 
         query = """
-        SELECT id, project_id, image_width, image_height, x_offset, y_offset, image
+        SELECT *
         FROM Images
         WHERE project_id = %s
         LIMIT %s OFFSET %s
