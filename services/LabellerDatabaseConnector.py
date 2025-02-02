@@ -115,12 +115,12 @@ class MYSQLLabellerDatabaseConnector(LabellerDatabaseConnector):
             
 
     
-LD = MYSQLLabellerDatabaseConnector()       
+# LD = MYSQLLabellerDatabaseConnector()       
 
-l = Labeller(LabellerID='1', skill = 'plane', alpha=1.1, beta=1)
+# l = Labeller(LabellerID='1', skill = 'plane', alpha=1.1, beta=1)
 
 
-print(l.LabellerID)
-print(l.skill)
-LD.push_labeller(l)
-print(LD.get_labellers("SELECT * FROM my_image_db.Labeller_skills;"))
+# print(l.LabellerID)
+# print(l.skill)
+# LD.push_labeller(l)
+# print(LD.get_labellers("SELECT * FROM my_image_db.Labeller_skills;"))

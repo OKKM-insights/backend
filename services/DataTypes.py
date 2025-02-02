@@ -13,6 +13,7 @@ class Label():
     offset_x: int
     offset_y: int
     creation_time: str
+    origImageID: str
 
     def __init__(self,
                 LabelID: str=None,
@@ -25,7 +26,8 @@ class Label():
                 bot_right_y: int= None,
                 offset_x: int= None,
                 offset_y: int= None,
-                creation_time: str= None):
+                creation_time: str= None,
+                origImageID: str = None):
         '''
         If making a new Label object (not loading from database), set ID to None
         '''
@@ -43,6 +45,7 @@ class Label():
         self.offset_x = offset_x
         self.offset_y = offset_y
         self.creation_time = creation_time
+        self.origImageID = origImageID
 
 
 class Labeller():

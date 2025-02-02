@@ -84,7 +84,8 @@ class MYSQLLabelDatabaseConnector(LabelDatabaseConnector):
                                                                label.bot_right_y,
                                                                label.offset_x,
                                                                label.offset_y,
-                                                               label.creation_time}""")
+                                                               label.creation_time,
+                                                               label.origImageID}""")
                 )
                 connection.commit()
                 print(f"Query sucessful")
@@ -110,7 +111,8 @@ class MYSQLLabelDatabaseConnector(LabelDatabaseConnector):
                         bot_right_x=res[7],
                         bot_right_y=res[8],
                         offset_x=res[9],
-                        offset_y=res[10]
+                        offset_y=res[10],
+                        origImageID=res[11]
                     )
                     results.append(l)
                 return results

@@ -4,14 +4,16 @@ import pandas as pd
 from ImageClassMeasureDatabaseConnector import ImageClassMeasureDatabaseConnector, MYSQLImageClassMeasureDatabaseConnector
 from scipy.special import beta
 from collections import deque
+from LabellerDatabaseConnector import LabellerDatabaseConnector
 
 class ObjectExtractionService:
 
     # generates a list of ImageObjects which have likelihoods over a certain amount
 
-    def __init__(self, icm_db: ImageClassMeasureDatabaseConnector, threshold: float=.7):
+    def __init__(self, icm_db: ImageClassMeasureDatabaseConnector, labeller_db: LabellerDatabaseConnector, threshold: float=.7):
         self.threshold = threshold
         self.icm_db = icm_db
+        self.labeller_db = labeller_db
 
     def get_objects(self, image: Image, Class: str, labellers: list[Labeller], labels: list[Label]) -> list[ImageObject]:
         # get objects for a given image and class
@@ -40,12 +42,13 @@ class ObjectExtractionService:
 
         for i, labeller in labellers.iterrows(): 
             tmp_labels = labels[labels['LabellerID'] == labeller['LabellerID']]
-            self.__update_labeler_accuracy(icm, tmp_labels, Labeller(labeller['LabellerID'],
+            l = Labeller(labeller['LabellerID'],
                                                                      labeller['skill'],
                                                                      labeller['alpha'],
                                                                      labeller['beta']
-                                                                     ))
-
+                                                                     )
+            self.__update_labeler_accuracy(icm, tmp_labels, l)
+            self.labeller_db.push_labeller(l)
         groups = self.__find_connected_groups(icm.likelihoods)
         output = []
         for group in groups:
@@ -56,7 +59,7 @@ class ObjectExtractionService:
             output.append(ImageObject(None, image.ImageID, Class, min_confidence, group, [Label()]))
 
         self.icm_db.push_imageclassmeasure(icm)
-        
+
         return output
 
     def __get_icm(self, imageID: str, Class: str) -> ImageClassMeasure:
@@ -159,8 +162,8 @@ class ObjectExtractionService:
 
         return groups
 
-o = ObjectExtractionService()
-i = Image('1','2','1')
-ls = [Labeller('t', 'boat','1.1','1.2'),
-      Labeller('2', 'boat','1.3','1.2')]
-o.get_objects(i, ls, None)
+# o = ObjectExtractionService()
+# i = Image('1','2','1')
+# ls = [Labeller('t', 'boat','1.1','1.2'),
+#       Labeller('2', 'boat','1.3','1.2')]
+# o.get_objects(i, ls, None)

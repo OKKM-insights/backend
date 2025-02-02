@@ -44,7 +44,8 @@ class LabelServer():
                       top_left_y=request_data['top_left_y'],
                       offset_x=request_data['offset_x'],
                       offset_y=request_data['offset_y'],
-                      creation_time=request_data['creation_time']
+                      creation_time=request_data['creation_time'],
+                      origImageID=request_data['OrigImageID']
                       )
         try:
             self.db.push_label(label=label)

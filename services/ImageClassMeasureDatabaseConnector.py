@@ -168,12 +168,12 @@ class MYSQLImageClassMeasureDatabaseConnector(ImageClassMeasureDatabaseConnector
       
 
     
-LD = MYSQLImageClassMeasureDatabaseConnector()       
+# LD = MYSQLImageClassMeasureDatabaseConnector()       
 
-l = Label('08500f1e-9eff-4d1a-8d9c-1f1d0a2a2bd6','t','t','class',0,0,0,0,0,0,'0')
+# l = Label('08500f1e-9eff-4d1a-8d9c-1f1d0a2a2bd6','t','t','class',0,0,0,0,0,0,'0')
 
-I = ImageClassMeasure('test', None, None, None, 'label', 400, 400)
+# I = ImageClassMeasure('test', None, None, None, 'label', 400, 400)
 
-LD.push_imageclassmeasure(I)
-res = LD.get_imageclassmeasures("SELECT * FROM ImageClassMeasure Where ImageID = 'test2' and Label = 'label';")
-print(res.likelihoods)
+# LD.push_imageclassmeasure(I)
+# res = LD.get_imageclassmeasures("SELECT * FROM ImageClassMeasure Where ImageID = 'test2' and Label = 'label';")
+# print(res.likelihoods)
