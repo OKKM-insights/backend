@@ -78,12 +78,12 @@ class MYSQLLabelDatabaseConnector(LabelDatabaseConnector):
                                                                label.LabellerID, 
                                                                label.ImageID,
                                                                label.Class,
-                                                               label.top_left_x,
-                                                               label.top_left_y,
-                                                               label.bot_right_x,
-                                                               label.bot_right_y,
-                                                               label.offset_x,
-                                                               label.offset_y,
+                                                               label.top_left_x if label.top_left_x else 'NULL',
+                                                               label.top_left_y if label.top_left_y else 'NULL',
+                                                               label.bot_right_x if label.bot_right_x else 'NULL',
+                                                               label.bot_right_y if label.bot_right_y else 'NULL',
+                                                               label.offset_x if label.offset_x else 'NULL',
+                                                               label.offset_y if label.offset_y else 'NULL',
                                                                label.creation_time,
                                                                label.origImageID}""")
                 )

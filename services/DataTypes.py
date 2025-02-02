@@ -28,9 +28,11 @@ class Label():
                 offset_y: int= None,
                 creation_time: str= None,
                 origImageID: str = None):
+
         '''
         If making a new Label object (not loading from database), set ID to None
         '''
+
         if not LabelID:
             self.LabelID = str(uuid.uuid4())
         else:
@@ -46,6 +48,8 @@ class Label():
         self.offset_y = offset_y
         self.creation_time = creation_time
         self.origImageID = origImageID
+
+
 
 
 class Labeller():
@@ -80,6 +84,7 @@ class ImageObject():
                  ImageID:str = None,
                  Class: str = None,
                  Confidence: float = None,
+
                  related_pixels: list[int] = None,
                  related_labels: list[Label] = None,):
         if not ImageObjectID:
@@ -100,6 +105,7 @@ class ImageObject():
         self.ImageID = ImageID
         self.Class = Class
         self.Confidence = Confidence
+
 
 
 class Image():
@@ -126,6 +132,7 @@ class Project():
         self.ProjectID = ProjectID
         self.classes = classes
         self.images = images
+
 
 
 class ImageClassMeasure:
