@@ -22,15 +22,21 @@ class ObjectExtractionService:
         labellers = pd.DataFrame([l.__dict__ for l in labellers])
         labels = pd.DataFrame([l.__dict__ for l in labels])
 
-        labels = labels[labels['Class'] == Class]
-        labellers = labellers[labellers['LabellerID'].isin(labels['LabellerID'])]
+        # labels = labels[labels['Class'] == Class]
+        labellers = labellers[labellers['skill']==Class]
 
+        print(labels)
+        print(labellers)
         icm = self.__get_icm(image.ImageID, Class)
 
         if not icm:
+            print('creating new ICM')
             icm = ImageClassMeasure(image.ImageID, None, None, None, Class, len(image_data[0]), len(image_data[1]))
-        
+        else:
+            print('ICM loaded')
+
         for i, labeller in labellers.iterrows(): 
+            print(f'applying label group {i}')
             tmp_labels = labels[labels['LabellerID'] == labeller['LabellerID']]
             self.__update_label_likelihood(icm, tmp_labels, Labeller(labeller['LabellerID'],
                                                                      labeller['skill'],
@@ -40,7 +46,9 @@ class ObjectExtractionService:
         
         self.__update_label_confidence(icm)
 
-        for i, labeller in labellers.iterrows(): 
+        for i, labeller in labellers.iterrows():
+            id = labeller['LabellerID']
+            print(f'updating labeller {id}') 
             tmp_labels = labels[labels['LabellerID'] == labeller['LabellerID']]
             l = Labeller(labeller['LabellerID'],
                                                                      labeller['skill'],
@@ -50,6 +58,7 @@ class ObjectExtractionService:
             self.__update_labeler_accuracy(icm, tmp_labels, l)
             self.labeller_db.push_labeller(l)
         groups = self.__find_connected_groups(icm.likelihoods)
+        print(f'found {len(groups)} groups')
         output = []
         for group in groups:
             min_confidence = 1
@@ -64,7 +73,7 @@ class ObjectExtractionService:
 
     def __get_icm(self, imageID: str, Class: str) -> ImageClassMeasure:
         query = f"""
-            SELECT * FROM ImageClassMeasure Where ImageID = {imageID} and Label = {Class};
+            SELECT * FROM ImageClassMeasure Where ImageID = '{imageID}' and Label = '{Class}';
         """
         return self.icm_db.get_imageclassmeasures(query)
 

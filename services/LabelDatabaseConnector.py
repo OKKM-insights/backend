@@ -105,13 +105,14 @@ class MYSQLLabelDatabaseConnector(LabelDatabaseConnector):
                         LabelID=res[0],
                         LabellerID=res[1],
                         ImageID=res[2],
-                        Class=res[4],
-                        top_left_x=res[5],
-                        top_left_y=res[6],
-                        bot_right_x=res[7],
-                        bot_right_y=res[8],
-                        offset_x=res[9],
-                        offset_y=res[10],
+                        Class=res[3],
+                        top_left_x=res[4],
+                        top_left_y=res[5],
+                        bot_right_x=res[6],
+                        bot_right_y=res[7],
+                        offset_x=res[8],
+                        offset_y=res[9],
+                        creation_time=res[10],
                         origImageID=res[11]
                     )
                     results.append(l)
