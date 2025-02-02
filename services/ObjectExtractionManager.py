@@ -28,15 +28,20 @@ class ObjectExtractionManager():
         project = self.project_db.get_projects(query_projects)[0]
         objects = []
         for image in project.images:
-            query_labels = f"SELECT * FROM my_image_db.Labels WHERE (ImageID = {image.ImageID}) and (Class = '{Class}');"
+            query_labels = f"SELECT * FROM my_image_db.Labels WHERE (OrigImageID = {image.ImageID}) and (Class = '{Class}');"
             labels = self.label_db.get_labels(query_labels)
             print(f"found {len(labels)} labels")
             labeller_ids = set()
             for label in labels:
                 labeller_ids.add(label.LabellerID)
-            query_labellers = f"SELECT * FROM my_image_db.Labeller_skills WHERE Labeller_id IN ({tuple(labeller_ids)});"
-            labellers = self.labeller_db.get_labellers(query_labellers)
+
+            query_labellers = f"SELECT * FROM my_image_db.Labeller_skills WHERE Labeller_id IN :ids"
+
+            labellers = self.labeller_db.get_labellers_with_data(query_labellers, {'ids': tuple(labeller_ids)})
             
+            print(labellers)
+            print(labels[0].__dict__)
+
             objects.append(self.object_service.get_objects(image, Class, labellers, labels))
 
         for object_list in objects:
