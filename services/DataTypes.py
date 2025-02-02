@@ -13,6 +13,7 @@ class Label():
     offset_x: int
     offset_y: int
     creation_time: str
+    origImageID: str
 
     def __init__(self,
                 LabelID: str=None,
@@ -25,7 +26,8 @@ class Label():
                 bot_right_y: int= None,
                 offset_x: int= None,
                 offset_y: int= None,
-                creation_time: str= None):
+                creation_time: str= None,
+                origImageID: str = None):
 
         '''
         If making a new Label object (not loading from database), set ID to None
@@ -45,12 +47,14 @@ class Label():
         self.offset_x = offset_x
         self.offset_y = offset_y
         self.creation_time = creation_time
+        self.origImageID = origImageID
+
 
 
 
 class Labeller():
     LabellerID: str
-    skills: str
+    skill: str
     alpha: float
     beta: float
 
@@ -131,3 +135,30 @@ class Project():
 
 
 
+class ImageClassMeasure:
+    # contains the values necessary to calculate the probability for each pixel to be a given label
+    imageID: str
+    likelihoods: list[list[float]]
+    confidence: list[list[float]]
+    helper_values: list[list[list[float]]]
+    label: str
+    im_height: int
+    im_width: int
+    
+    def __init__(self, imageID, likelihoods, confidence, helper_values, label, im_width, im_height):
+        if not likelihoods:
+            self.likelihoods = [[0.5] * im_width for _ in range(im_height)]
+        else:
+            self.likelihoods = likelihoods
+        if not confidence:
+            self.confidence = [[0.0] * im_width for _ in range(im_height)]
+        else:
+            self.confidence = confidence
+        if not helper_values:
+            self.helper_values = [[[0.5,0.5] for _ in range(im_width)] for _ in range(im_height)] # running total for P(w_i | L = 0) & P(w_i | L = 1)
+        else:
+            self.helper_values = helper_values
+        self.imageID = imageID
+        self.label = label
+        self.im_width = im_width
+        self.im_height = im_height

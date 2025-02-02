@@ -50,7 +50,8 @@ class LabelServer():
                         top_left_y=req['top_left_y'],
                         offset_x=req['offset_x'],
                         offset_y=req['offset_y'],
-                        creation_time=req['creation_time']
+                        creation_time=req['creation_time'],
+                        origImageID=req['OrigImageID']
                         )
                 self.db.push_label(label=label)
 
