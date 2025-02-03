@@ -113,7 +113,7 @@ def create_project():
 
                 # Insert the tile into the Images table
                 insert_tile_query = """
-                    INSERT INTO Images (project_id, original_image_id, image_width, image_height, x_offset, y_offset, image)
+                    INSERT INTO Images (project_id, orig_image_id, image_width, image_height, x_offset, y_offset, image)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """
                 cursor.execute(insert_tile_query, (project_id, original_image_id, tile_size, tile_size, x_offset, y_offset, img_blob))
