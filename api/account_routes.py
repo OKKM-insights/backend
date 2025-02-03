@@ -33,7 +33,7 @@ def register_user():
 
             client_query = """
             INSERT INTO Clients (email, password, profile_picture, name, industry, typical_projects)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             """
             cursor.execute(client_query, (email, password, profile_picture_blob, name, industry, typical_projects))
 
