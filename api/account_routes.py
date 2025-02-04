@@ -172,19 +172,19 @@ def login_user():
         user_info = {
             'id': user['id'],
             'email': user['email'], 
-            'profile_picture': base64.b64encode(user['profile_picture']).decode('utf-8') if user['profile_picture'] else None
+            'profilePicture': base64.b64encode(user['profile_picture']).decode('utf-8') if user['profile_picture'] else None
         }
 
         if user_type == 'client':
             user_info.update({
-                'company_name': user['company_name'],
+                'name': user['company_name'],
                 'industry': user['industry'],
-                'typical_projects': user['typical_projects']
+                'typicalProj': user['typical_projects']
             })
         elif user_type == 'labeller':
             user_info.update({
-                'first_name': user['first_name'],
-                'last_name': user['last_name'],
+                'firstName': user['first_name'],
+                'lastName': user['last_name'],
                 'skills': user['skills'],
                 'availability': user['availability']
             })
@@ -316,3 +316,64 @@ def get_project_categories(project_id):
     finally:
         cursor.close()
         conn.close()
+
+
+@user_project_blueprint.route('/api/update-user/<int:user_id>', methods=['PUT'])
+def update_user(user_id):
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        user_type = data.get('userType')
+        profile_picture_base64 = data.get('profilePicture')
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        profile_picture_blob = None
+        if profile_picture_base64:
+            profile_picture_blob = base64.b64decode(profile_picture_base64)
+
+        if user_type == 'client':
+            name = data.get('name')
+            industry = data.get('industry')
+            typical_projects = data.get('typicalProj')
+
+            update_query = """
+            UPDATE Clients 
+            SET email = %s, name = %s, industry = %s, typical_projects = %s 
+            """
+            values = [email, name, industry, typical_projects]
+
+        elif user_type == 'labeller':
+            first_name = data.get('firstName')
+            last_name = data.get('lastName')
+            skills = data.get('skills')
+            availability = data.get('availability')
+
+            update_query = """
+            UPDATE Labellers 
+            SET email = %s, first_name = %s, last_name = %s, skills = %s, availability = %s
+            """
+            values = [email, first_name, last_name, skills, availability]
+
+        if profile_picture_blob:
+            update_query += ", profile_picture = %s"
+            values.append(profile_picture_blob)
+
+        update_query += " WHERE id = %s"
+        values.append(user_id)
+
+        cursor.execute(update_query, tuple(values))
+        conn.commit()
+
+        return jsonify({'message': 'User updated successfully'}), 200
+
+    except Exception as e:
+        print(str(e))
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
