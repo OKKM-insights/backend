@@ -25,6 +25,10 @@ class LabellerDatabaseConnector(ABC):
     def get_labellers(self, query:str) -> list[Labeller]:
         pass
 
+    @abstractmethod
+    def get_labellers_with_data(self, query:str, data) -> list[Labeller]:
+        pass
+
 class NoneDB(LabellerDatabaseConnector):
 
 
@@ -37,6 +41,9 @@ class NoneDB(LabellerDatabaseConnector):
 
 
     def get_labellers(self, query:str) -> list[Labeller]:
+        pass
+
+    def get_labellers_with_data(self, query:str, data) -> list[Labeller]:
         pass
 
 class MYSQLLabellerDatabaseConnector(LabellerDatabaseConnector):
@@ -111,16 +118,30 @@ class MYSQLLabellerDatabaseConnector(LabellerDatabaseConnector):
                 print("Error {e}")
                 raise Exception(e)
             
+    def get_labellers_with_data(self, query:str, data) -> list[Labeller]:
+        self.make_db_connection()
+        # query should be something like 'where id = x' or 'where skill = 'x''
+        results = []
+        with self.cnx.connect() as connection:
+            try:
+                result = connection.execute(text(query), data)
+                print(f"Query returned {result.rowcount} results") 
+                for res in result:
+                    results.append(Labeller(res[0], res[1], res[2], res[3]))
+                return results
+            except Exception as e:
+                print("Error {e}")
+                raise Exception(e)   
     
             
 
     
-LD = MYSQLLabellerDatabaseConnector()       
+# LD = MYSQLLabellerDatabaseConnector()       
 
-l = Labeller(LabellerID='1', skill = 'plane', alpha=1.1, beta=1)
+# l = Labeller(LabellerID='1', skill = 'plane', alpha=1.1, beta=1)
 
 
-print(l.LabellerID)
-print(l.skill)
-LD.push_labeller(l)
-print(LD.get_labellers("SELECT * FROM my_image_db.Labeller_skills;"))
+# print(l.LabellerID)
+# print(l.skill)
+# LD.push_labeller(l)
+# print(LD.get_labellers("SELECT * FROM my_image_db.Labeller_skills;"))

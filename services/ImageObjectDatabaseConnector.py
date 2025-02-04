@@ -197,12 +197,12 @@ class MYSQLImageObjectDatabaseConnector(ImageObjectDatabaseConnector):
                 raise Exception(e)        
 
     
-LD = MYSQLImageObjectDatabaseConnector()       
+# LD = MYSQLImageObjectDatabaseConnector()       
 
-l = Label('08500f1e-9eff-4d1a-8d9c-1f1d0a2a2bd6','t','t','class',0,0,0,0,0,0,'0')
+# l = Label('08500f1e-9eff-4d1a-8d9c-1f1d0a2a2bd6','t','t','class',0,0,0,0,0,0,'0')
 
-I = ImageObject('test', 't', 't', 0.1, [[0,0],[0,1],[0,2],[0,3]], [l])
+# I = ImageObject('test', 't', 't', 0.1, [[0,0],[0,1],[0,2],[0,3]], [l])
 
-LD.push_imageobject(I)
-res = LD.get_imageobjects("SELECT * FROM ImageObjects;")
-print(res[0].related_labels)
+# LD.push_imageobject(I)
+# res = LD.get_imageobjects("SELECT * FROM ImageObjects;")
+# print(res[0].related_labels)
