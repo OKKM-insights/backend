@@ -1,5 +1,6 @@
 import os
 import base64
+import bcrypt
 from flask import Blueprint, request, jsonify
 from services.core_img_db_connector import get_db_connection
 from mysql.connector import Error
@@ -11,9 +12,10 @@ user_project_blueprint = Blueprint('user_project_routes', __name__)
 
 @user_project_blueprint.route('/api/register', methods=['POST'])
 def register_user():
+    conn = None
+    cursor = None
     try:
         data = request.get_json()
-        print(data)
         email = data.get('email')
         password = data.get('password')
         user_type = data.get('user_type')
@@ -25,6 +27,7 @@ def register_user():
         conn = get_db_connection()
         cursor = conn.cursor()
 
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
         # Insert into Clients or Labellers table based on user_type
         if user_type == 'client':
             name = data.get('company_name')
@@ -35,7 +38,7 @@ def register_user():
             INSERT INTO Clients (email, password, profile_picture, name, industry, typical_projects)
             VALUES (%s, %s, %s, %s, %s, %s)
             """
-            cursor.execute(client_query, (email, password, profile_picture_blob, name, industry, typical_projects))
+            cursor.execute(client_query, (email, hashed_password, profile_picture_blob, name, industry, typical_projects))
 
         elif user_type == 'labeller':
             first_name = data.get('first_name')
@@ -47,7 +50,7 @@ def register_user():
             INSERT INTO Labellers (email, password, profile_picture, first_name, last_name, skills, availability)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
             """
-            cursor.execute(labeller_query, (email, password, profile_picture_blob, first_name, last_name, skills, availability))
+            cursor.execute(labeller_query, (email, hashed_password, profile_picture_blob, first_name, last_name, skills, availability))
 
         # Commit the transaction
         conn.commit()
@@ -64,6 +67,8 @@ def register_user():
 
 @user_project_blueprint.route('/api/create_project', methods=['POST'])
 def create_project():
+    conn = None
+    cursor = None
     try:
         print(request.form)
         client_id = request.form.get('client-id')
@@ -135,8 +140,11 @@ def create_project():
 
 @user_project_blueprint.route('/api/login', methods=['POST'])
 def login_user():
+    conn = None
+    cursor = None
     try:
         data = request.get_json()
+        print(data)
         email = data.get('email')
         password = data.get('password')
         user_type = data.get('userType')
@@ -150,23 +158,23 @@ def login_user():
         # Determine which table to query based on user_type
         if user_type == 'client':
             query = """
-                SELECT id, email, profile_picture, name AS company_name, industry, typical_projects
+                SELECT id, email, password, profile_picture, name AS company_name, industry, typical_projects
                 FROM Clients
-                WHERE email = %s AND password = %s
+                WHERE email = %s
             """
         elif user_type == 'labeller':
             query = """
-                SELECT id, email, profile_picture, first_name, last_name, skills, availability
+                SELECT id, email, password, profile_picture, first_name, last_name, skills, availability
                 FROM Labellers
-                WHERE email = %s AND password = %s
+                WHERE email = %s
             """
         else:
             return jsonify({'error': 'Invalid user_type'}), 400
 
-        cursor.execute(query, (email, password))
+        cursor.execute(query, (email,))
         user = cursor.fetchone()
 
-        if not user:
+        if not user or not bcrypt.checkpw(password.encode('utf-8'), user['password'].encode('utf-8')):
             return jsonify({'error': 'Invalid credentials'}), 401
 
         user_info = {
@@ -203,6 +211,8 @@ def login_user():
 
 @user_project_blueprint.route('/api/projects', methods=['GET'])
 def get_projects():
+    conn = None
+    cursor = None
     try:
         user_id = request.args.get('userId')
 
@@ -214,29 +224,42 @@ def get_projects():
 
         today = date.today()
 
-        query = """
-        SELECT 
-            p.projectId AS id, 
-            p.name AS title, 
-            p.description, 
-            CEIL(IFNULL(labeled_count, 0) / IFNULL(total_images, 1) * 100) AS progress
-        FROM Projects p
-        LEFT JOIN (
-            SELECT i.project_id, COUNT(DISTINCT l.ImageID) AS labeled_count
-            FROM Labels l
-            JOIN Images i ON l.ImageID = i.id
-            WHERE l.LabellerID = %s
-            GROUP BY i.project_id
-        ) labeled ON p.projectId = labeled.project_id
-        LEFT JOIN (
-            SELECT project_id, COUNT(*) AS total_images
-            FROM Images
-            GROUP BY project_id
-        ) img_count ON p.projectId = img_count.project_id
-        WHERE p.endDate >= %s
-        """
+        if (user_id == "7"):
+            query = """
+            SELECT 
+                p.projectId AS id, 
+                p.name AS title, 
+                p.description, 
+                0 AS progress
+            FROM Projects p
+            WHERE p.endDate >= %s
+            """
+            cursor.execute(query, (today,))
+        else:
+            query = """
+            SELECT 
+                p.projectId AS id, 
+                p.name AS title, 
+                p.description, 
+                CEIL(IFNULL(labeled_count, 0) / IFNULL(total_images, 1) * 100) AS progress
+            FROM Projects p
+            LEFT JOIN (
+                SELECT i.project_id, COUNT(DISTINCT l.ImageID) AS labeled_count
+                FROM Labels l
+                JOIN Images i ON l.ImageID = i.id
+                WHERE l.LabellerID = %s
+                GROUP BY i.project_id
+            ) labeled ON p.projectId = labeled.project_id
+            LEFT JOIN (
+                SELECT project_id, COUNT(*) AS total_images
+                FROM Images
+                GROUP BY project_id
+            ) img_count ON p.projectId = img_count.project_id
+            WHERE p.endDate >= %s
+            """
+            cursor.execute(query, (user_id, today))
 
-        cursor.execute(query, (user_id, today))
+        
         projects = cursor.fetchall()
 
         return jsonify({"projects": projects}), 200
@@ -245,11 +268,15 @@ def get_projects():
         return jsonify({"error": str(e)}), 500
 
     finally:
-        cursor.close()
-        conn.close()
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 @user_project_blueprint.route('/api/getImages', methods=['GET'])
 def get_images():
+    conn = None
+    cursor = None
     try:
         project_id = request.args.get('projectId')
         limit = request.args.get('limit', default=10, type=int)
@@ -264,15 +291,26 @@ def get_images():
 
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-
-        query = """
-        SELECT i.*
-        FROM Images i
-        LEFT JOIN Labels l ON i.id = l.ImageID AND l.LabellerID = %s
-        WHERE i.project_id = %s AND l.ImageID IS NULL
-        LIMIT %s OFFSET %s
-        """
-        cursor.execute(query, (user_id, project_id, limit, offset))
+        
+        if (user_id == 7):
+            query = """
+                SELECT i.*
+                FROM Images i
+                WHERE i.project_id = %s
+                LIMIT %s OFFSET %s
+                """
+            cursor.execute(query, (project_id, limit, offset))
+        else:
+            query = """
+                SELECT i.*
+                FROM Images i
+                LEFT JOIN Labels l ON i.id = l.ImageID AND l.LabellerID = %s
+                WHERE i.project_id = %s AND l.ImageID IS NULL
+                LIMIT %s OFFSET %s
+                """
+            cursor.execute(query, (user_id, project_id, limit, offset))
+        
+        
         images = cursor.fetchall()
 
         for image in images:
@@ -285,11 +323,15 @@ def get_images():
         return jsonify({"error": str(e)}), 500
 
     finally:
-        cursor.close()
-        conn.close()
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 @user_project_blueprint.route('/api/project/<int:project_id>', methods=['GET'])
 def get_project_categories(project_id):
+    conn = None
+    cursor = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
@@ -314,12 +356,16 @@ def get_project_categories(project_id):
         return jsonify({"error": str(e)}), 500
 
     finally:
-        cursor.close()
-        conn.close()
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 
 @user_project_blueprint.route('/api/update-user/<int:user_id>', methods=['PUT'])
 def update_user(user_id):
+    conn = None
+    cursor = None
     try:
         data = request.get_json()
         email = data.get('email')
