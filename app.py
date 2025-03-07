@@ -13,6 +13,7 @@ def create_app():
     CORS(app, resources={r"/api/*": {"origins": ["https://orbitwatch.xyz", "http://localhost:3000"]}})
     app.register_blueprint(image_blueprint)
     app.register_blueprint(user_project_blueprint)
+    print("launched")
     return app
 
 app = create_app()

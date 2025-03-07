@@ -3,6 +3,7 @@ import base64
 import bcrypt
 from flask import Blueprint, request, jsonify
 from services.core_img_db_connector import get_db_connection
+from utils.ImagePreprocess import preprocess_image
 from mysql.connector import Error
 from datetime import date
 from PIL import Image
@@ -99,6 +100,18 @@ def create_project():
         """
         cursor.execute(image_query, (project_id, image_data))
         original_image_id = cursor.lastrowid
+
+
+        # better preprocessing
+        OBJECTSIZE = 64 #m - Size of the object in meters (max dimension)
+        RESOLUTION = 3 #pixels per meter (resolution of satalite image)
+        OBJECTSINFRAME = 5 #number of objects that fit in the frame
+
+        PIXELSIZE = OBJECTSIZE * RESOLUTION #pixels the object takes up in image
+        FRAMEPIXELSIZE = PIXELSIZE * OBJECTSINFRAME #pixels per meter
+
+        # function call to utils here
+        print(preprocess_image(image_data))
 
         # Very rough preprocessing
         img = Image.open(io.BytesIO(image_data))
