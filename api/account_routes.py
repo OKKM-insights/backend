@@ -111,7 +111,7 @@ def create_project():
         FRAMEPIXELSIZE = PIXELSIZE * OBJECTSINFRAME #pixels per meter
 
         # function call to utils here
-        print(preprocess_image(image_data))
+        preprocess_image(image_data)
 
         # Very rough preprocessing
         img = Image.open(io.BytesIO(image_data))
