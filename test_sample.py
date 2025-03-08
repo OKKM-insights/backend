@@ -1,6 +1,6 @@
 import pytest
 
-def pass_test():
+def test_pass():
   pass
 
 
