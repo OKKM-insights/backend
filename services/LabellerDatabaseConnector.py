@@ -6,7 +6,7 @@ import uuid
 import time
 import datetime
 import json
-from DataTypes import Labeller
+from .DataTypes import Labeller
 import urllib.parse
 import pymysql
 

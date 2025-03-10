@@ -6,7 +6,7 @@ import uuid
 import time
 import datetime
 import json
-from DataTypes import Label
+from .DataTypes import Label
 import urllib.parse
 import pymysql
 

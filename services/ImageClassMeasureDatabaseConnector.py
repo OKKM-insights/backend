@@ -6,7 +6,7 @@ import uuid
 import time
 import datetime
 import json
-from DataTypes import ImageClassMeasure, Label
+from .DataTypes import ImageClassMeasure, Label
 import urllib.parse
 import pymysql
 
