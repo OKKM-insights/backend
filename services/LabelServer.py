@@ -1,4 +1,5 @@
 from LabelDatabaseConnector import LabelDatabaseConnector, MYSQLLabelDatabaseConnector
+from ReportGenerator import ReportGenerator
 from DataTypes import Label
 from flask import Flask, Response, request
 from flask_cors import CORS, cross_origin
@@ -7,10 +8,12 @@ import json
 
 class LabelServer():
 
-    def __init__(self, db: LabelDatabaseConnector):
+    def __init__(self, db: LabelDatabaseConnector, report_generator: ReportGenerator):
         self.version = '1.0'
 
         self.db = db
+        self.report_generator = report_generator
+
         self.app = Flask(__name__)
         CORS(self.app)
 
@@ -19,6 +22,12 @@ class LabelServer():
             ,endpoint=f'/{self.version}/push_label'
             ,view_func=self.push_label
             ,methods=['POST']
+        )
+        self.app.add_url_rule(
+            rule=f'/{self.version}/get_report'
+            ,endpoint=f'/{self.version}/get_report'
+            ,view_func=self.get_report
+            ,methods=['GET']
         )
         self.app.run()
 
@@ -60,10 +69,33 @@ class LabelServer():
         except KeyError as e:
             return Response(status=400, response=str(e))
         except Exception as e:
-            print("other Error")
+            print(f"other Error: {e}")
             return Response(status=400, response=str(e))
         
         return Response(status=200, response='all labels saved')
+    
+
+    def get_report(self) -> Response:
+        try:
+            project_id = request.headers.get('projectid')
+        except Exception as e:
+            print(e)
+            return Response(status=400, response='ensure request has \'projectid\' field')
+        
+        print(project_id)
+        try:
+            resp = self.report_generator.get_report_info(project_id)
+
+        except ValueError as e:
+            return Response(status=400, response=str(e))
+        except KeyError as e:
+            return Response(status=400, response=str(e))
+        except Exception as e:
+            print("other Error")
+            return Response(status=400, response=str(e))
+        
+        return Response(status=200, response=resp)
 
 db = MYSQLLabelDatabaseConnector()
-server = LabelServer(db)
+rp = ReportGenerator()
+server = LabelServer(db, rp)

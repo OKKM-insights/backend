@@ -4,7 +4,7 @@ from LabellerDatabaseConnector import LabellerDatabaseConnector, MYSQLLabellerDa
 from ImageObjectDatabaseConnector import ImageObjectDatabaseConnector, MYSQLImageObjectDatabaseConnector
 from ObjectExtractionService import ObjectExtractionService
 from ImageClassMeasureDatabaseConnector import MYSQLImageClassMeasureDatabaseConnector
-
+from DataTypes import Labeller
 
 class ObjectExtractionManager():
 
@@ -38,7 +38,12 @@ class ObjectExtractionManager():
             query_labellers = f"SELECT * FROM my_image_db.Labeller_skills WHERE Labeller_id IN :ids"
 
             labellers = self.labeller_db.get_labellers_with_data(query_labellers, {'ids': tuple(labeller_ids)})
-            
+
+            found_labeller_ids = [labeller.LabellerID for labeller in labellers]
+            for labeller_id in labeller_ids:
+                if labeller_id not in found_labeller_ids:
+                    labellers.append(Labeller(labeller_id, Class))
+
             print(labellers)
             print(labels[0].__dict__)
 
@@ -51,5 +56,5 @@ class ObjectExtractionManager():
 
 
 t = ObjectExtractionManager(MYSQLProjectDatabaseConnector(),MYSQLLabelDatabaseConnector(), MYSQLLabellerDatabaseConnector(), MYSQLImageObjectDatabaseConnector(), ObjectExtractionService(MYSQLImageClassMeasureDatabaseConnector(), MYSQLLabellerDatabaseConnector()))
-t.get_objects('5', 'plane')
+t.get_objects('14', 'plane')
 
