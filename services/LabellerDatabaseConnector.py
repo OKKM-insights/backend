@@ -132,6 +132,24 @@ class MYSQLLabellerDatabaseConnector(LabellerDatabaseConnector):
             except Exception as e:
                 print("Error {e}")
                 raise Exception(e)   
+            
+
+    def get_labeller_info_with_data(self, query:str, data) -> list[Labeller]:
+        self.make_db_connection()
+        # query should be something like 'where id = x' or 'where skill = 'x''
+        results = []
+        with self.cnx.connect() as connection:
+            try:
+                result = connection.execute(text(query), data)
+                print(f"Query returned {result.rowcount} results") 
+                for res in result:
+                    results.append({'profile_picture': str(res[2]),
+                                    'first_name': res[3],
+                                     'creation_date': str(res[7])})
+                return results
+            except Exception as e:
+                print("Error {e}")
+                raise Exception(e)  
     
             
 
