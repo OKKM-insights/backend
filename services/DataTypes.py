@@ -128,10 +128,11 @@ class Project():
     classes: list[str]
     images: list[Image]
 
-    def __init__(self, ProjectID: str, classes: list[str], images: list[Image]):
+    def __init__(self, ProjectID: str, classes: list[str], images: list[Image], end_date=None):
         self.ProjectID = ProjectID
         self.classes = classes
         self.images = images
+        self.end_date = end_date
 
 
 
