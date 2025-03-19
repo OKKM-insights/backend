@@ -91,7 +91,7 @@ class LabelServer():
         except KeyError as e:
             return Response(status=400, response=str(e))
         except Exception as e:
-            print("other Error")
+            print(e)
             return Response(status=400, response=str(e))
         
         return Response(status=200, response=resp)
