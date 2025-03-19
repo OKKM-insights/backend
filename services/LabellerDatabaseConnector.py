@@ -9,6 +9,7 @@ import json
 from DataTypes import Labeller
 import urllib.parse
 import pymysql
+import base64
 
 
 class LabellerDatabaseConnector(ABC):
