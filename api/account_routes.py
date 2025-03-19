@@ -273,6 +273,52 @@ def get_projects():
         if conn:
             conn.close()
 
+@user_project_blueprint.route('/api/client_projects', methods=['GET'])
+def get_client_projects():
+    conn = None
+    cursor = None
+    try:
+        client_id = request.args.get('clientId')
+
+        if not client_id:
+            return jsonify({"error": "Missing userId parameter"}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        today = date.today()
+
+        query = """
+        SELECT 
+            p.projectId AS id, 
+            p.name AS title, 
+            p.description, 
+            CEIL(IFNULL(labeled_count, 0)) AS progress
+        FROM Projects p
+        LEFT JOIN (
+            SELECT i.project_id, COUNT(l.ImageID) AS labeled_count
+            FROM Labels l
+            JOIN Images i ON l.ImageID = i.id
+            GROUP BY i.project_id
+        ) labeled ON p.projectId = labeled.project_id
+        WHERE p.endDate >= %s AND p.clientId = %s
+        """
+        cursor.execute(query, (today, client_id))
+
+        
+        projects = cursor.fetchall()
+
+        return jsonify({"projects": projects}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
 @user_project_blueprint.route('/api/getImages', methods=['GET'])
 def get_images():
     conn = None
