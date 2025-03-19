@@ -71,6 +71,7 @@ class MYSQLProjectDatabaseConnector(ProjectDatabaseConnector):
         projects = []
         project_ids = []
         categories = []
+        end_dates = []
 
         with self.cnx.connect() as connection:
             try:
@@ -79,6 +80,7 @@ class MYSQLProjectDatabaseConnector(ProjectDatabaseConnector):
                 for res in result:
                     project_ids.append(res[0])
                     categories.append(res[5].split(','))
+                    end_dates.append(res[4])
             except Exception as e:
                 print("Error {e}")
                 raise Exception(e)
@@ -103,7 +105,7 @@ class MYSQLProjectDatabaseConnector(ProjectDatabaseConnector):
 
                     for res in result:
                         images.append(Image(res[0], res[1], pilImage.open(io.BytesIO(res[2]))))
-                    projects.append(Project(id, categories[i], images.copy()))
+                    projects.append(Project(id, categories[i], images.copy(), end_dates[i]))
             except Exception as e:
                 print("Error {e}")
                 raise Exception(e)
