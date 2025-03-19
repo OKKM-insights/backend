@@ -143,7 +143,7 @@ class MYSQLLabellerDatabaseConnector(LabellerDatabaseConnector):
                 result = connection.execute(text(query), data)
                 print(f"Query returned {result.rowcount} results") 
                 for res in result:
-                    results.append({'profile_picture': base64.b64encode(user['profile_picture']).decode('utf-8') if user['profile_picture'] else None,
+                    results.append({'profile_picture': base64.b64encode(res[2]).decode('utf-8') if res[2] else None,
                                     'first_name': res[3],
                                      'creation_date': str(res[7])})
                 return results
