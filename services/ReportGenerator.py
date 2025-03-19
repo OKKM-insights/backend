@@ -34,9 +34,12 @@ class ReportGenerator():
         for image in project.images:
             query_labels = f"SELECT * FROM my_image_db.Labels WHERE (OrigImageID = {image.ImageID}) Order BY creation_time DESC;"
             labels = self.LabelDatabaseConnector.get_labels(query_labels)
-            print(f"found {len(labels)} labels")
             
-            last_label_time = str(labels[0].creation_time)
+            print(f"found {len(labels)} labels")
+            try:
+                last_label_time = str(labels[0].creation_time)
+            except:
+                pass
 
             for label in labels:
                 labeller_ids.add(label.LabellerID)
@@ -60,14 +63,16 @@ class ReportGenerator():
             num_labels += len(labels)
             num_labellers += len(labeller_ids)
             
-            print(labels[0].__dict__)
+           
 
         top_3_labellers = sorted(label_count_by_labeller, key=label_count_by_labeller.get, reverse=True)[:3]
 
-        query_labellers = f"SELECT * FROM my_image_db.Labellers WHERE id IN :ids"
-        labellers = self.LabellerDatabaseConnector.get_labeller_info_with_data(query_labellers, {'ids': tuple(top_3_labellers)})
+        if top_3_labellers:
+            query_labellers = f"SELECT * FROM my_image_db.Labellers WHERE id IN :ids"
+            labellers = self.LabellerDatabaseConnector.get_labeller_info_with_data(query_labellers, {'ids': tuple(top_3_labellers)})
         num_images = len(project.images)
-        avg_num_labels = (num_labels / num_images) / num_labellers
+        if num_labels > 0:
+            avg_num_labels = (num_labels / num_images) / num_labellers
 
         user_label_count = [0,0,0]
         user_info = [None, None, None]
