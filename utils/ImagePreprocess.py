@@ -3,6 +3,7 @@ import numpy as np
 import io
 from PIL import Image
 
+import mysql.connector
 
 # Config
 # ------------------------------------------------------------  
@@ -14,13 +15,11 @@ PIXELSIZE = OBJECTSIZE * RESOLUTION #pixels the object takes up in image
 FRAMEPIXELSIZE = PIXELSIZE * OBJECTSINFRAME #pixels per meter
 # ------------------------------------------------------------  
 
-def preprocess_image(image_np):
+def preprocess_image(image_np: np.ndarray) -> list[dict]:
 
-    # Image partitioning with buffer
     tiles = []
     img_height, img_width = image_np.shape[:2] #width and height
 
-    # Calculate steps to ensure full coverage with overlap at the edges
     def get_positions(total_size, frame_size):
         positions = list(range(0, total_size - frame_size + 1, frame_size))
         if total_size - positions[-1] > 0:  # if there's remaining space
@@ -50,11 +49,11 @@ def preprocess_image(image_np):
             core_end_y = core_start_y + FRAMEPIXELSIZE
             core_end_x = core_start_x + FRAMEPIXELSIZE
             
-            # overlay for buffer zone
-            overlay = np.ones_like(full_tile) * [255, 100, 100]  # Light red tint RGB
+
+            overlay = np.ones_like(full_tile) * [255, 100, 100] 
             mask = np.ones_like(full_tile, dtype=bool)
             mask[core_start_y:core_end_y, core_start_x:core_end_x] = False
-            full_tile[mask] = full_tile[mask] * 0.5 + overlay[mask] * 0.5 #color weights
+            full_tile[mask] = full_tile[mask] * 0.5 + overlay[mask] * 0.5
             
             tiles.append({
                 'tile': full_tile,
@@ -68,21 +67,18 @@ def preprocess_image(image_np):
 
     return tiles
 
-def store_tiles(tiles, project_id, original_image_id, cursor):
+def store_tiles(tiles: list[dict], project_id: str, original_image_id: str, cursor: mysql.connector.cursor.MySQLCursor) -> None:
 
     for tile_data in tiles:
         # Convert numpy array back to PIL Image
         tile_img = Image.fromarray(tile_data['tile'].astype('uint8'))
         
-        # Convert the tile to blob (byte data)
         img_byte_arr = io.BytesIO()
         tile_img.save(img_byte_arr, format='PNG')
         img_blob = img_byte_arr.getvalue()
 
-        # Get tile dimensions
         height, width = tile_data['tile'].shape[:2]
 
-        # Insert the tile into the Images table
         insert_tile_query = """
             INSERT INTO Images (project_id, orig_image_id, image_width, image_height, x_offset, y_offset, image)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
