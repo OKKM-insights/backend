@@ -1,10 +1,10 @@
-from DataTypes import ImageObject, Labeller, Label, Image, ImageClassMeasure
+from .DataTypes import ImageObject, Labeller, Label, Image, ImageClassMeasure
 import numpy as np
 import pandas as pd
-from ImageClassMeasureDatabaseConnector import ImageClassMeasureDatabaseConnector, MYSQLImageClassMeasureDatabaseConnector
+from .ImageClassMeasureDatabaseConnector import ImageClassMeasureDatabaseConnector, MYSQLImageClassMeasureDatabaseConnector
 from scipy.special import beta
 from collections import deque
-from LabellerDatabaseConnector import LabellerDatabaseConnector
+from .LabellerDatabaseConnector import LabellerDatabaseConnector
 
 class ObjectExtractionService:
 
@@ -79,21 +79,46 @@ class ObjectExtractionService:
 
 
     def __update_label_likelihood(self, icm: ImageClassMeasure, labels:pd.DataFrame, labeller: Labeller):
-    # modifies the probabilities of each pixel being in the class based on a new set of labels made by the same labeler
-    # can be ported to GPU if performance requires
-
+        # modifies the probabilities of each pixel being in the class based on a new set of labels made by the same labeler
+        # can be ported to GPU if performance requires
+        print("Starting label likelihood update...")
+        
         a = labeller.alpha
         b = labeller.beta
-
-        for row in range(icm.im_height):
-            for col in range(icm.im_width):
-                class_prediction = 0
-                for i, label in labels.iterrows():
-                    if (col >= label['top_left_x'] + label['offset_x'] and col <= label['bot_right_x'] + label['offset_x'] and row >= label['top_left_y'] + label['offset_y'] and row <= label['bot_right_y'] + label['offset_y']):
-                        class_prediction = 1
-                icm.helper_values[row][col][0] *= beta(1-class_prediction + a, class_prediction + b)
-                icm.helper_values[row][col][1] *= beta(class_prediction + a, 1-class_prediction + b)
-                icm.likelihoods[row][col] = icm.helper_values[row][col][1] / (icm.helper_values[row][col][1] + icm.helper_values[row][col][0])
+        
+        # Pre-compute bounding boxes for faster lookup
+        boxes = []
+        for _, label in labels.iterrows():
+            boxes.append({
+                'x1': label['top_left_x'] + label['offset_x'],
+                'x2': label['bot_right_x'] + label['offset_x'],
+                'y1': label['top_left_y'] + label['offset_y'],
+                'y2': label['bot_right_y'] + label['offset_y']
+            })
+        
+        # Process rows in chunks for progress reporting
+        chunk_size = 50
+        total_rows = icm.im_height
+        for row in range(0, total_rows, chunk_size):
+            if row % 100 == 0:
+                print(f"Processing rows {row} to {min(row + chunk_size, total_rows)} of {total_rows}")
+            
+            for r in range(row, min(row + chunk_size, total_rows)):
+                for col in range(icm.im_width):
+                    # Check if pixel is in any bounding box
+                    class_prediction = 0
+                    for box in boxes:
+                        if (col >= box['x1'] and col <= box['x2'] and 
+                            r >= box['y1'] and r <= box['y2']):
+                            class_prediction = 1
+                            break
+                    
+                    # Update helper values and likelihood
+                    icm.helper_values[r][col][0] *= beta(1-class_prediction + a, class_prediction + b)
+                    icm.helper_values[r][col][1] *= beta(class_prediction + a, 1-class_prediction + b)
+                    icm.likelihoods[r][col] = icm.helper_values[r][col][1] / (icm.helper_values[r][col][1] + icm.helper_values[r][col][0])
+        
+        print("Label likelihood update completed.")
 
     def __update_label_confidence(self, icm: ImageClassMeasure):
         for row in range(icm.im_height):

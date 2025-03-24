@@ -6,9 +6,10 @@ import uuid
 import time
 import datetime
 import json
-from DataTypes import Label
+from .DataTypes import Label
 import urllib.parse
 import pymysql
+import traceback
 
 
 class LabelDatabaseConnector(ABC):
@@ -45,16 +46,18 @@ class MYSQLLabelDatabaseConnector(LabelDatabaseConnector):
         self.cnx = None
         self.make_db_connection()
         self.table=table
+        self.update_schema()
 
     def make_db_connection(self):
         load_dotenv()
-        MYSQLUSER=os.getenv('_LABELDATABASE_MYSQLUSER')
-        MYSQLPASSWORD=os.getenv('_LABELDATABASE_MYSQLPASSWORD')
-        MYSQLHOST=os.getenv('_LABELDATABASE_MYSQLHOST')
-        MYSQLDATABASE=os.getenv('_LABELDATABASE_MYSQLDATABASE')
+        MYSQLUSER=os.getenv('DB_USER')
+        MYSQLPASSWORD=os.getenv('DB_PASSWORD')
+        MYSQLHOST=os.getenv('DB_HOSTNAME')
+        MYSQLDATABASE=os.getenv('DB_NAME')
+        MYSQLPORT=os.getenv('DB_PORT')
 
         try:
-            self.cnx = create_engine(url=f"mysql+pymysql://{MYSQLUSER}:{urllib.parse.quote_plus(MYSQLPASSWORD)}@{urllib.parse.quote_plus(MYSQLHOST)}/{MYSQLDATABASE}")
+            self.cnx = create_engine(url=f"mysql+pymysql://{MYSQLUSER}:{urllib.parse.quote_plus(MYSQLPASSWORD)}@{urllib.parse.quote_plus(MYSQLHOST)}:{MYSQLPORT}/{MYSQLDATABASE}")
                                             
         except Exception as e:
             print("Error {e}")
@@ -68,30 +71,85 @@ class MYSQLLabelDatabaseConnector(LabelDatabaseConnector):
                 print("Error {e}")
                 raise ConnectionError(e)
 
+    def update_schema(self):
+        """Update the database schema if needed."""
+        # Skip schema updates since we'll work with the existing schema
+        print("Using existing database schema")
+        return
+
+    def push_image(self, image_path, project_id):
+        """Push an image to the database."""
+        try:
+            connection = self.cnx.connect()
+            
+            # Generate a unique ID for the image
+            image_id = int(uuid.uuid4().int % 2147483647)  # Use integer ID to match schema
+            
+            # Insert only the image ID and project ID - no image_path field
+            command = """
+            INSERT INTO OriginalImages (ImageID, ProjectID)
+            VALUES (:image_id, :project_id)
+            """
+            
+            # Execute the command with parameters
+            result = connection.execute(
+                text(command),
+                {
+                    "image_id": image_id,
+                    "project_id": project_id
+                }
+            )
+            
+            connection.commit()
+            print(f"Successfully added image with ID: {image_id}")
+            return image_id
+            
+        except Exception as e:
+            print(f"Error adding image: {e}")
+            return None
+        finally:
+            connection.close()
 
     def push_label(self, label:Label):
-        self.make_db_connection()
-        with self.cnx.connect() as connection:
-            try:
-                result = connection.execute(
-                    text(f"""INSERT INTO {self.table} VALUES { label.LabelID,
-                                                               label.LabellerID, 
-                                                               label.ImageID,
-                                                               label.Class,
-                                                               label.top_left_x if label.top_left_x else 'NULL',
-                                                               label.top_left_y if label.top_left_y else 'NULL',
-                                                               label.bot_right_x if label.bot_right_x else 'NULL',
-                                                               label.bot_right_y if label.bot_right_y else 'NULL',
-                                                               label.offset_x if label.offset_x else 'NULL',
-                                                               label.offset_y if label.offset_y else 'NULL',
-                                                               label.creation_time,
-                                                               label.origImageID}""")
-                )
-                connection.commit()
-                print(f"Query sucessful")
-            except Exception as e:
-                print("Error {e}")
-                raise Exception(e)
+        """Push a label to the database."""
+        try:
+            connection = self.cnx.connect()
+            
+            # Get the important fields and make sure they match the schema
+            image_id = label.get("image_id")
+            x1 = label.get("x1")
+            y1 = label.get("y1")
+            x2 = label.get("x2")
+            y2 = label.get("y2")
+            confidence = label.get("confidence", 0.0)
+            
+            # Insert into Labels table with only the columns we need
+            command = """
+            INSERT INTO Labels (ImageID, X1, Y1, X2, Y2, Confidence)
+            VALUES (:image_id, :x1, :y1, :x2, :y2, :confidence)
+            """
+            
+            result = connection.execute(
+                text(command),
+                {
+                    "image_id": image_id,
+                    "x1": x1,
+                    "y1": y1,
+                    "x2": x2,
+                    "y2": y2,
+                    "confidence": confidence
+                }
+            )
+            
+            connection.commit()
+            print("Successfully added label")
+            return result.lastrowid
+            
+        except Exception as e:
+            print(f"Error adding label: {e}")
+            return None
+        finally:
+            connection.close()
 
     def get_labels(self, query:str) -> list[Label]:
         self.make_db_connection()

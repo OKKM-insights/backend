@@ -7,6 +7,8 @@ from mysql.connector import Error
 from datetime import date
 from PIL import Image
 import io
+from services.ml_service import trigger_ml_detection
+import uuid
 
 user_project_blueprint = Blueprint('user_project_routes', __name__)
 
@@ -92,13 +94,24 @@ def create_project():
         cursor.execute(project_query, (client_id, project_name, project_description, end_date, analysis_goal))
         project_id = cursor.lastrowid
 
-        image_data = image.read()
+        # Generate a unique ID for the image
+        image_id = int(uuid.uuid4().int % 2147483647)  # Use integer ID to match schema
+
+        # Insert into OriginalImages table - no image column in the actual schema
         image_query = """
-            INSERT INTO OriginalImages (projectId, image) 
+            INSERT INTO OriginalImages (ImageID, ProjectID) 
             VALUES (%s, %s)
         """
-        cursor.execute(image_query, (project_id, image_data))
-        original_image_id = cursor.lastrowid
+        cursor.execute(image_query, (image_id, project_id))
+
+        # Read the image data for the tile processing
+        image_data = image.read()
+
+        # Trigger ML model detection
+        print(f"\nTriggering ML detection for image {image_id}...")
+        ml_success = trigger_ml_detection(image_id)
+        if not ml_success:
+            print("Warning: ML detection failed, but continuing with image processing")
 
         # Very rough preprocessing
         img = Image.open(io.BytesIO(image_data))
@@ -121,12 +134,15 @@ def create_project():
                     INSERT INTO Images (project_id, orig_image_id, image_width, image_height, x_offset, y_offset, image)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """
-                cursor.execute(insert_tile_query, (project_id, original_image_id, tile_size, tile_size, x_offset, y_offset, img_blob))
-
+                cursor.execute(insert_tile_query, (project_id, image_id, tile_size, tile_size, x_offset, y_offset, img_blob))
 
         conn.commit()
 
-        return jsonify({'message': 'Project created successfully', 'project_id': project_id}), 200
+        return jsonify({
+            'message': 'Project created successfully', 
+            'project_id': project_id,
+            'ml_detection_success': ml_success
+        }), 200
 
     except Error as e:
         print(str(e))
