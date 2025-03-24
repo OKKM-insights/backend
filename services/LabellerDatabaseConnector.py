@@ -6,10 +6,11 @@ import uuid
 import time
 import datetime
 import json
-from DataTypes import Labeller
+from .DataTypes import Labeller
 import urllib.parse
 import pymysql
 import base64
+import subprocess
 
 
 class LabellerDatabaseConnector(ABC):
@@ -55,26 +56,28 @@ class MYSQLLabellerDatabaseConnector(LabellerDatabaseConnector):
         self.table=table
 
     def make_db_connection(self):
+        """Create a database connection."""
         load_dotenv()
-        MYSQLUSER=os.getenv('_LABELDATABASE_MYSQLUSER')
-        MYSQLPASSWORD=os.getenv('_LABELDATABASE_MYSQLPASSWORD')
-        MYSQLHOST=os.getenv('_LABELDATABASE_MYSQLHOST')
-        MYSQLDATABASE=os.getenv('_LABELDATABASE_MYSQLDATABASE')
-
-        try:
-            self.cnx = create_engine(url=f"mysql+pymysql://{MYSQLUSER}:{urllib.parse.quote_plus(MYSQLPASSWORD)}@{urllib.parse.quote_plus(MYSQLHOST)}/{MYSQLDATABASE}")
-                                            
-        except Exception as e:
-            print("Error {e}")
-            raise ConnectionError(e)
         
-        if self.cnx:
-            try:
-                self.cnx.connect()
-                print('connection successful')
-            except Exception as e:
-                print("Error {e}")
-                raise ConnectionError(e)
+        # Get database credentials from environment variables
+        user = os.getenv('DB_USER', 'admin')
+        password = os.getenv('DB_PASSWORD', 'password')
+        host = os.getenv('DB_HOSTNAME', 'localhost')
+        database = os.getenv('DB_NAME', 'my_image_db')
+        port = os.getenv('DB_PORT', '3306')
+        
+        try:
+            # Create the connection URL with proper encoding
+            connection_url = f"mysql+pymysql://{user}:{urllib.parse.quote_plus(password)}@{host}:{port}/{database}"
+            self.cnx = create_engine(connection_url)
+            
+            # Test the connection
+            with self.cnx.connect() as connection:
+                print('Database connection successful')
+                
+        except Exception as e:
+            print(f"Database connection error: {str(e)}")
+            raise
 
 
     def push_labeller(self, labeller:Labeller):
@@ -164,3 +167,5 @@ class MYSQLLabellerDatabaseConnector(LabellerDatabaseConnector):
 # print(l.skill)
 # LD.push_labeller(l)
 # print(LD.get_labellers("SELECT * FROM my_image_db.Labeller_skills;"))
+
+subprocess.run("cmd /c \"mysql -u Kartik -p my_image_db < backend/sql/update_icm_schema.sql\"", shell=True)
