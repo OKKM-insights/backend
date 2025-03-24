@@ -3,10 +3,12 @@ import base64
 import bcrypt
 from flask import Blueprint, request, jsonify
 from services.core_img_db_connector import get_db_connection
+from utils.ImagePreprocess import preprocess_image, store_tiles
 from mysql.connector import Error
 from datetime import date
 from PIL import Image
 import io
+import numpy as np
 
 user_project_blueprint = Blueprint('user_project_routes', __name__)
 
@@ -100,29 +102,15 @@ def create_project():
         cursor.execute(image_query, (project_id, image_data))
         original_image_id = cursor.lastrowid
 
-        # Very rough preprocessing
+
         img = Image.open(io.BytesIO(image_data))
-        img_width, img_height = img.size
-        tile_size = 300
+        image_np = np.array(img)
 
-        for y_offset in range(0, img_height, tile_size):
-            for x_offset in range(0, img_width, tile_size):
-                # Ensure we don't go beyond the image boundary
-                box = (x_offset, y_offset, min(x_offset + tile_size, img_width), min(y_offset + tile_size, img_height))
-                tile = img.crop(box)
+        # Partition the image into tiles
+        tiles = preprocess_image(image_np)
 
-                # Convert the tile to a blob (byte data)
-                img_byte_arr = io.BytesIO()
-                tile.save(img_byte_arr, format='PNG')
-                img_blob = img_byte_arr.getvalue()
-
-                # Insert the tile into the Images table
-                insert_tile_query = """
-                    INSERT INTO Images (project_id, orig_image_id, image_width, image_height, x_offset, y_offset, image)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """
-                cursor.execute(insert_tile_query, (project_id, original_image_id, tile_size, tile_size, x_offset, y_offset, img_blob))
-
+        # Store the tiles in the database
+        store_tiles(tiles, project_id, original_image_id, cursor)
 
         conn.commit()
 
