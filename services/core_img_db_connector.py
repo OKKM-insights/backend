@@ -23,7 +23,7 @@ def update_schema(connection):
         
         # Drop tables in order of dependencies
         cursor.execute("DROP TABLE IF EXISTS Labels")
-        cursor.execute("DROP TABLE IF EXISTS ImageClassMeasure")
+        # Note: ImageClassMeasure schema is managed by update_icm_schema.sql for pixel-wise user label aggregation
         cursor.execute("DROP TABLE IF EXISTS OriginalImages")
         
         # Create OriginalImages table
@@ -50,19 +50,12 @@ def update_schema(connection):
             )
         """)
         
-        # Create ImageClassMeasure table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS ImageClassMeasure (
-                MeasureID INT AUTO_INCREMENT PRIMARY KEY,
-                ImageID VARCHAR(255),
-                ClassName VARCHAR(255),
-                Confidence FLOAT,
-                FOREIGN KEY (ImageID) REFERENCES OriginalImages(ImageID)
-            )
-        """)
+        # Note: ImageClassMeasure (ICM) table is managed separately by update_icm_schema.sql
+        # This is because ICM requires a specific schema for pixel-wise user label aggregation
+        # See backend/sql/update_icm_schema.sql for the complete ICM schema
         
         connection.commit()
-        print("Schema updated successfully")
+        print("Core schema updated successfully")
         
     except Exception as e:
         print(f"Error updating schema: {e}")

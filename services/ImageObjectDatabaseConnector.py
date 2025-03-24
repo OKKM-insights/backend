@@ -6,7 +6,7 @@ import uuid
 import time
 import datetime
 import json
-from DataTypes import ImageObject, Label
+from backend.services.DataTypes import ImageObject, Label
 import urllib.parse
 import pymysql
 
@@ -48,25 +48,39 @@ class MYSQLImageObjectDatabaseConnector(ImageObjectDatabaseConnector):
 
     def make_db_connection(self):
         load_dotenv()
-        MYSQLUSER=os.getenv('_LABELDATABASE_MYSQLUSER')
-        MYSQLPASSWORD=os.getenv('_LABELDATABASE_MYSQLPASSWORD')
-        MYSQLHOST=os.getenv('_LABELDATABASE_MYSQLHOST')
-        MYSQLDATABASE=os.getenv('_LABELDATABASE_MYSQLDATABASE')
-
-        try:
-            self.cnx = create_engine(url=f"mysql+pymysql://{MYSQLUSER}:{urllib.parse.quote_plus(MYSQLPASSWORD)}@{urllib.parse.quote_plus(MYSQLHOST)}/{MYSQLDATABASE}")
-                                            
-        except Exception as e:
-            print("Error {e}")
-            raise ConnectionError(e)
         
-        if self.cnx:
-            try:
-                self.cnx.connect()
-                print('connection successful')
-            except Exception as e:
-                print("Error {e}")
-                raise ConnectionError(e)
+        # Get database credentials from environment variables
+        MYSQLUSER = os.getenv('DB_USER', 'admin')
+        MYSQLPASSWORD = os.getenv('DB_PASSWORD', '')
+        MYSQLHOST = os.getenv('DB_HOSTNAME', 'orbitwatch.clugm0820uni.us-east-1.rds.amazonaws.com')
+        MYSQLDATABASE = os.getenv('DB_NAME', 'my_image_db')
+
+        print(f"\nConnecting to database:")
+        print(f"Host: {MYSQLHOST}")
+        print(f"Database: {MYSQLDATABASE}")
+        print(f"User: {MYSQLUSER}")
+        
+        # Ensure all values are strings and encode them properly
+        try:
+            # Create connection URL with proper encoding
+            connection_url = (
+                f"mysql+pymysql://"
+                f"{urllib.parse.quote_plus(str(MYSQLUSER))}:"
+                f"{urllib.parse.quote_plus(str(MYSQLPASSWORD))}@"
+                f"{urllib.parse.quote_plus(str(MYSQLHOST))}/"
+                f"{urllib.parse.quote_plus(str(MYSQLDATABASE))}"
+            )
+            
+            self.cnx = create_engine(url=connection_url)
+            
+            # Test the connection
+            with self.cnx.connect() as connection:
+                connection.execute(text("SELECT 1"))
+                print('Database connection successful')
+                
+        except Exception as e:
+            print(f"Database connection error: {str(e)}")
+            raise ConnectionError(f"Failed to connect to database: {str(e)}")
 
 
     def push_imageobject(self, imageobject:ImageObject):
