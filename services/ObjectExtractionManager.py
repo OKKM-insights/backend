@@ -1,10 +1,11 @@
 from ProjectDatabaseConnector import ProjectDatabaseConnector, MYSQLProjectDatabaseConnector
 from LabelDatabaseConnector import LabelDatabaseConnector, MYSQLLabelDatabaseConnector
 from LabellerDatabaseConnector import LabellerDatabaseConnector, MYSQLLabellerDatabaseConnector
-from ImageObjectDatabaseConnector import ImageObjectDatabaseConnector, MYSQLImageObjectDatabaseConnector
+from ImageObjectDatabaseConnector_bb import ImageObjectDatabaseConnector_bb, MYSQLImageObjectDatabaseConnector_bb
 from ObjectExtractionService import ObjectExtractionService
 from ImageClassMeasureDatabaseConnector import MYSQLImageClassMeasureDatabaseConnector
 from DataTypes import Labeller
+import time
 
 class ObjectExtractionManager():
 
@@ -13,7 +14,7 @@ class ObjectExtractionManager():
                  project_db: ProjectDatabaseConnector,
                  label_db: LabelDatabaseConnector,
                  labeller_db: LabellerDatabaseConnector,
-                 imageobject_db: ImageObjectDatabaseConnector,
+                 imageobject_db: ImageObjectDatabaseConnector_bb,
                  object_service: ObjectExtractionService):
         self.project_db = project_db
         self.label_db = label_db
@@ -23,6 +24,7 @@ class ObjectExtractionManager():
         
     
     def get_objects(self, project_id, Class):
+        t = time.time()
         query_projects = f"SELECT * FROM my_image_db.Projects WHERE projectId = {project_id};"
 
         project = self.project_db.get_projects(query_projects)[0]
@@ -52,9 +54,9 @@ class ObjectExtractionManager():
         for object_list in objects:
             for ob in object_list:
                 self.imageobject_db.push_imageobject(ob)
+        print(f"completed in {time.time()-t} seconds")
 
 
-
-t = ObjectExtractionManager(MYSQLProjectDatabaseConnector(),MYSQLLabelDatabaseConnector(), MYSQLLabellerDatabaseConnector(), MYSQLImageObjectDatabaseConnector(), ObjectExtractionService(MYSQLImageClassMeasureDatabaseConnector(), MYSQLLabellerDatabaseConnector()))
-t.get_objects('14', 'plane')
+t = ObjectExtractionManager(MYSQLProjectDatabaseConnector(),MYSQLLabelDatabaseConnector(), MYSQLLabellerDatabaseConnector(), MYSQLImageObjectDatabaseConnector_bb(), ObjectExtractionService(MYSQLImageClassMeasureDatabaseConnector(), MYSQLLabellerDatabaseConnector()))
+t.get_objects('64', 'plane')
 
