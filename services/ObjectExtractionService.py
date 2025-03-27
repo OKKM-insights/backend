@@ -73,7 +73,7 @@ class ObjectExtractionService:
             output.append(ImageObject_bb(None, image.ImageID, Class, 0,  tlx, tly, brx, bry))
 
         print("updating icm")
-        self.icm_db.push_imageclassmeasure(icm)
+        self.icm_db.push_imageclassmeasure_images(icm)
         print("icm updated")
         return output
 

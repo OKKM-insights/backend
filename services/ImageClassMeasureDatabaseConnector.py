@@ -9,6 +9,8 @@ import json
 from DataTypes import ImageClassMeasure, Label
 import urllib.parse
 import pymysql
+import numpy as np
+import matplotlib.pyplot as plt
 
 
 class ImageClassMeasureDatabaseConnector(ABC):
@@ -112,6 +114,49 @@ class MYSQLImageClassMeasureDatabaseConnector(ImageClassMeasureDatabaseConnector
                 print(f"Error: {e}")
                 raise Exception(e)
 
+    def push_imageclassmeasure_images(self, imageclassmeasure:ImageClassMeasure):
+
+        query_imageclassmeasure_db = text("""
+            INSERT INTO ImageClassMeasure_images (ImageID, label, likelihood, confidence, helpervalue_1, helpervalue_2, im_height, im_width) 
+            VALUES (:ImageID, :label, :likelihood, :confidence, :helpervalue_1, :helpervalue_2, :im_height, :im_width)
+            ON DUPLICATE KEY UPDATE 
+            likelihood = VALUES(likelihood),
+            confidence = VALUES(confidence),
+            helpervalue_1 = VALUES(helpervalue_1),
+            helpervalue_2 = VALUES(helpervalue_2);
+        """)
+
+
+
+        with self.cnx.connect() as connection:
+            helper_values_1 = [[pixel[0] for pixel in row] for row in imageclassmeasure.helper_values]
+            helper_values_2 = [[pixel[1] for pixel in row] for row in imageclassmeasure.helper_values]
+
+            try:
+                # Collect all rows before executing the query
+                plt.imshow(np.array(imageclassmeasure.likelihoods, dtype=np.float16))
+                plt.savefig("tmp_img.png")
+                data = {
+                            "ImageID": imageclassmeasure.imageID,
+                            "label": imageclassmeasure.label,
+                            "likelihood": np.array(imageclassmeasure.likelihoods, dtype=np.float16).tobytes(),
+                            "confidence": np.array(imageclassmeasure.confidence, dtype=np.float16).tobytes(),
+                            "helpervalue_1":np.array(helper_values_1, dtype=np.float16).tobytes(),
+                            "helpervalue_2":np.array(helper_values_2, dtype=np.float16).tobytes(),
+                            "im_height": imageclassmeasure.im_height,
+                            "im_width": imageclassmeasure.im_width
+                        }
+
+
+                connection.execute(query_imageclassmeasure_db, data)
+                
+                connection.commit()
+                print("Query successful")
+            except Exception as e:
+                print(f"Error: {e}")
+                raise Exception(e)
+            
+
     def get_imageclassmeasures(self, query:str) -> ImageClassMeasure:
         # --only request one object at a time please 😭🙏--
         self.make_db_connection()
@@ -143,6 +188,54 @@ class MYSQLImageClassMeasureDatabaseConnector(ImageClassMeasureDatabaseConnector
                     helpervalue_2.append(res[7])
                     im_height = res[8]
                     im_width = res[9]
+
+            except Exception as e:
+                print("Error {e}")
+                raise Exception(e)
+            
+            print(imageID)
+
+            likelihoods_ordered = [[0.5] * im_width for _ in range(im_height)]
+            confidence_ordered = [[0.0] * im_width for _ in range(im_height)]
+            helper_values_ordered = [[[0.5,0.5] for _ in range(im_width)] for _ in range(im_height)]
+
+            for i in range(im_height*im_width):
+                likelihoods_ordered[y[i]][x[i]] =  likelihoods[i]
+                confidence_ordered[y[i]][x[i]] = confidences[i]
+                helper_values_ordered[y[i]][x[i]][0] = helpervalue_1[i]
+                helper_values_ordered[y[i]][x[i]][1] = helpervalue_2[i]
+            
+        icm = ImageClassMeasure(imageID, likelihoods_ordered, confidence_ordered, helper_values_ordered, label, im_width, im_height)
+        return icm
+    
+    def get_imageclassmeasures_images(self, query:str) -> ImageClassMeasure:
+        # --only request one object at a time please 😭🙏--
+        self.make_db_connection()
+
+        imageID= ''
+        label = ''
+        likelihoods = None
+        confidences = None
+        helpervalue_1 = None
+        helpervalue_2 = None
+        im_height = 0
+        im_width = 0
+        with self.cnx.connect() as connection:
+            try:
+                result = connection.execute(text(query))
+                print(f"Query returned {result.rowcount} results") 
+                if result.rowcount == 0:
+                    return None
+                for res in result:
+                    imageID = res[0]
+                    label = res[1]
+                    im_height = res[6]
+                    im_width = res[7]
+                    likelihoods = np.frombuffer()
+                    confidences.append(res[5])
+                    helpervalue_1.append(res[6])
+                    helpervalue_2.append(res[7])
+                    
 
             except Exception as e:
                 print("Error {e}")
