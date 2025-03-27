@@ -79,9 +79,9 @@ class ObjectExtractionService:
 
     def __get_icm(self, imageID: str, Class: str) -> ImageClassMeasure:
         query = f"""
-            SELECT * FROM ImageClassMeasure Where ImageID = '{imageID}' and Label = '{Class}';
+            SELECT * FROM ImageClassMeasure_images Where ImageID = '{imageID}' and Label = '{Class}';
         """
-        return self.icm_db.get_imageclassmeasures(query)
+        return self.icm_db.get_imageclassmeasures_images(query)
 
 
     def __update_label_likelihood(self, icm: ImageClassMeasure, labels:pd.DataFrame, labeller: Labeller):
@@ -190,8 +190,7 @@ class ObjectExtractionService:
 
         
         icm.likelihoods = likelihoods.reshape(icm.im_width, icm.im_height)
-        icm.helper_values[0] = helper_value_1.reshape(icm.im_width, icm.im_height)
-        icm.helper_values[2] = helper_value_2.reshape(icm.im_width, icm.im_height)
+        icm.helper_values = np.stack((helper_value_1.reshape(icm.im_width, icm.im_height), helper_value_2.reshape(icm.im_width, icm.im_height)), axis=-1)
 
         plt.imshow(icm.likelihoods)
         plt.colorbar()

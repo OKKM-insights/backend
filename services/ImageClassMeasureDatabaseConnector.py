@@ -133,9 +133,8 @@ class MYSQLImageClassMeasureDatabaseConnector(ImageClassMeasureDatabaseConnector
             helper_values_2 = [[pixel[1] for pixel in row] for row in imageclassmeasure.helper_values]
 
             try:
-                # Collect all rows before executing the query
-                plt.imshow(np.array(imageclassmeasure.likelihoods, dtype=np.float16))
-                plt.savefig("tmp_img.png")
+                # plt.imshow(np.array(imageclassmeasure.confidence, dtype=np.float16))
+                # plt.savefig("temp.jpeg")
                 data = {
                             "ImageID": imageclassmeasure.imageID,
                             "label": imageclassmeasure.label,
@@ -215,9 +214,9 @@ class MYSQLImageClassMeasureDatabaseConnector(ImageClassMeasureDatabaseConnector
         imageID= ''
         label = ''
         likelihoods = None
-        confidences = None
-        helpervalue_1 = None
-        helpervalue_2 = None
+        confidence = None
+        helper_value_1 = None
+        helper_value_2 = None
         im_height = 0
         im_width = 0
         with self.cnx.connect() as connection:
@@ -231,10 +230,10 @@ class MYSQLImageClassMeasureDatabaseConnector(ImageClassMeasureDatabaseConnector
                     label = res[1]
                     im_height = res[6]
                     im_width = res[7]
-                    likelihoods = np.frombuffer()
-                    confidences.append(res[5])
-                    helpervalue_1.append(res[6])
-                    helpervalue_2.append(res[7])
+                    likelihoods = np.frombuffer(res[2], dtype=np.float16).reshape((im_height, im_width, 1)).tolist()
+                    confidence= np.frombuffer(res[3], dtype=np.float16).reshape((im_height, im_width, 1)).tolist()
+                    helper_value_1 = np.frombuffer(res[4], dtype=np.float16).reshape((im_height, im_width, 1))
+                    helper_value_2 = np.frombuffer(res[5], dtype=np.float16).reshape((im_height, im_width, 1))
                     
 
             except Exception as e:
@@ -243,17 +242,11 @@ class MYSQLImageClassMeasureDatabaseConnector(ImageClassMeasureDatabaseConnector
             
             print(imageID)
 
-            likelihoods_ordered = [[0.5] * im_width for _ in range(im_height)]
-            confidence_ordered = [[0.0] * im_width for _ in range(im_height)]
-            helper_values_ordered = [[[0.5,0.5] for _ in range(im_width)] for _ in range(im_height)]
+            helper_values = np.stack((helper_value_1.reshape(im_width, im_height), helper_value_2.reshape(im_width, im_height)), axis=-1).tolist()
 
-            for i in range(im_height*im_width):
-                likelihoods_ordered[y[i]][x[i]] =  likelihoods[i]
-                confidence_ordered[y[i]][x[i]] = confidences[i]
-                helper_values_ordered[y[i]][x[i]][0] = helpervalue_1[i]
-                helper_values_ordered[y[i]][x[i]][1] = helpervalue_2[i]
             
-        icm = ImageClassMeasure(imageID, likelihoods_ordered, confidence_ordered, helper_values_ordered, label, im_width, im_height)
+            
+        icm = ImageClassMeasure(imageID, likelihoods, confidence, helper_values, label, im_width, im_height)
         return icm
             
             
