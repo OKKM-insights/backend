@@ -6,7 +6,13 @@ import uuid
 import time
 import datetime
 import json
-from DataTypes import Label
+import sys
+from pathlib import Path
+
+project_root = str(Path(__file__).parent.parent)
+sys.path.append(project_root)
+
+from services.DataTypes import Label
 import urllib.parse
 import pymysql
 
@@ -54,7 +60,10 @@ class MYSQLLabelDatabaseConnector(LabelDatabaseConnector):
         MYSQLDATABASE=os.getenv('_LABELDATABASE_MYSQLDATABASE')
 
         try:
-            self.cnx = create_engine(url=f"mysql+pymysql://{MYSQLUSER}:{urllib.parse.quote_plus(MYSQLPASSWORD)}@{urllib.parse.quote_plus(MYSQLHOST)}/{MYSQLDATABASE}")
+            self.cnx = create_engine(
+    url=f"mysql+pymysql://{str(MYSQLUSER)}:{urllib.parse.quote_plus(str(MYSQLPASSWORD))}"
+        f"@{urllib.parse.quote_plus(str(MYSQLHOST))}/{MYSQLDATABASE}"
+)
                                             
         except Exception as e:
             print("Error {e}")

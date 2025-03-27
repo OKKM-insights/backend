@@ -6,7 +6,12 @@ import uuid
 import time
 import datetime
 import json
-from DataTypes import ImageObject, Label
+import sys
+from pathlib import Path
+
+project_root = str(Path(__file__).parent.parent)
+sys.path.append(project_root)
+from services.DataTypes import ImageObject, Label
 import urllib.parse
 import pymysql
 
@@ -54,7 +59,10 @@ class MYSQLImageObjectDatabaseConnector(ImageObjectDatabaseConnector):
         MYSQLDATABASE=os.getenv('_LABELDATABASE_MYSQLDATABASE')
 
         try:
-            self.cnx = create_engine(url=f"mysql+pymysql://{MYSQLUSER}:{urllib.parse.quote_plus(MYSQLPASSWORD)}@{urllib.parse.quote_plus(MYSQLHOST)}/{MYSQLDATABASE}")
+            self.cnx = create_engine(
+    url=f"mysql+pymysql://{str(MYSQLUSER)}:{urllib.parse.quote_plus(str(MYSQLPASSWORD))}"
+        f"@{urllib.parse.quote_plus(str(MYSQLHOST))}/{MYSQLDATABASE}"
+)
                                             
         except Exception as e:
             print("Error {e}")
@@ -148,7 +156,7 @@ class MYSQLImageObjectDatabaseConnector(ImageObjectDatabaseConnector):
 
             query_label_ids = text("""
                                 SELECT * FROM Labels WHERE LabelID in 
-                                (SELECT LabelID FROM my_image_db.Labels_ImageObjects WHERE ImageObjectID = :imageobjectid);
+                                (SELECT LabelID FROM my_image_db_k.Labels_ImageObjects WHERE ImageObjectID = :imageobjectid);
                                    """)
             query_pixels = text("""SELECT x,y FROM Pixels_in_ImageObject WHERE ImageObjectID = :imageobjectid;
                                 """)

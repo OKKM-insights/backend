@@ -1,10 +1,15 @@
-from ProjectDatabaseConnector import ProjectDatabaseConnector, MYSQLProjectDatabaseConnector
-from LabelDatabaseConnector import LabelDatabaseConnector, MYSQLLabelDatabaseConnector
-from LabellerDatabaseConnector import LabellerDatabaseConnector, MYSQLLabellerDatabaseConnector
-from ImageObjectDatabaseConnector import ImageObjectDatabaseConnector, MYSQLImageObjectDatabaseConnector
-from ObjectExtractionService import ObjectExtractionService
-from ImageClassMeasureDatabaseConnector import MYSQLImageClassMeasureDatabaseConnector
-from DataTypes import Labeller
+import sys
+from pathlib import Path
+
+project_root = str(Path(__file__).parent.parent)
+sys.path.append(project_root)
+from services.ProjectDatabaseConnector import ProjectDatabaseConnector, MYSQLProjectDatabaseConnector
+from services.LabelDatabaseConnector import LabelDatabaseConnector, MYSQLLabelDatabaseConnector
+from services.LabellerDatabaseConnector import LabellerDatabaseConnector, MYSQLLabellerDatabaseConnector
+from services.ImageObjectDatabaseConnector import ImageObjectDatabaseConnector, MYSQLImageObjectDatabaseConnector
+from services.ObjectExtractionService import ObjectExtractionService
+from services.ImageClassMeasureDatabaseConnector import MYSQLImageClassMeasureDatabaseConnector
+from services.DataTypes import Labeller
 
 class ObjectExtractionManager():
 
@@ -23,19 +28,19 @@ class ObjectExtractionManager():
         
     
     def get_objects(self, project_id, Class):
-        query_projects = f"SELECT * FROM my_image_db.Projects WHERE projectId = {project_id};"
+        query_projects = f"SELECT * FROM my_image_db_k.Projects WHERE projectId = {project_id};"
 
         project = self.project_db.get_projects(query_projects)[0]
         objects = []
         for image in project.images:
-            query_labels = f"SELECT * FROM my_image_db.Labels WHERE (OrigImageID = {image.ImageID}) and (Class = '{Class}');"
+            query_labels = f"SELECT * FROM my_image_db_k.Labels WHERE (OrigImageID = {image.ImageID}) and (Class = '{Class}');"
             labels = self.label_db.get_labels(query_labels)
             print(f"found {len(labels)} labels")
             labeller_ids = set()
             for label in labels:
                 labeller_ids.add(label.LabellerID)
 
-            query_labellers = f"SELECT * FROM my_image_db.Labeller_skills WHERE Labeller_id IN :ids"
+            query_labellers = f"SELECT * FROM my_image_db_k.Labeller_skills WHERE Labeller_id IN :ids"
 
             labellers = self.labeller_db.get_labellers_with_data(query_labellers, {'ids': tuple(labeller_ids)})
 
