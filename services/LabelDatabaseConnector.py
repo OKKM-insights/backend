@@ -101,6 +101,20 @@ class MYSQLLabelDatabaseConnector(LabelDatabaseConnector):
             except Exception as e:
                 print("Error {e}")
                 raise Exception(e)
+    def push_labels_batch(self, labels_batch: list):
+        query = text("""
+            INSERT INTO Labels 
+            (LabelID, LabellerID, ImageID, Class, top_left_x, top_left_y, bot_right_x, bot_right_y, offset_x, offset_y, creation_time, origImageID)
+            VALUES (:LabelID, :LabellerID, :ImageID, :Class, :top_left_x, :top_left_y, :bot_right_x, :bot_right_y, :offset_x, :offset_y, :creation_time, :origImageID)
+            ON DUPLICATE KEY UPDATE 
+                top_left_x = VALUES(top_left_x),
+                top_left_y = VALUES(top_left_y),
+                bot_right_x = VALUES(bot_right_x),
+                bot_right_y = VALUES(bot_right_y)
+        """)
+        with self.cnx.connect() as connection:
+            connection.execute(query, labels_batch)
+            connection.commit()
 
     def get_labels(self, query:str) -> list[Label]:
         self.make_db_connection()
