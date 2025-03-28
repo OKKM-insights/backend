@@ -464,7 +464,7 @@ def get_original_image():
     conn = None
     cursor = None
     try:
-        image_id = request.args.get('imageId')
+        image_id = request.args.get('projectId')
 
         if not image_id:
             return jsonify({"error": "Missing imageId parameter"}), 400
