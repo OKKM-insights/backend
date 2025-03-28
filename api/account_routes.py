@@ -340,6 +340,7 @@ def get_images():
                 FROM Images i
                 LEFT JOIN Labels l ON i.id = l.ImageID AND l.LabellerID = %s
                 WHERE i.project_id = %s AND l.ImageID IS NULL
+                ORDER BY i.confidence ASC
                 LIMIT %s OFFSET %s
                 """
             cursor.execute(query, (user_id, project_id, limit, offset))
