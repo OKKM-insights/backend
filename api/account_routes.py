@@ -1,7 +1,7 @@
 import os
 import base64
 import bcrypt
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
 from services.core_img_db_connector import get_db_connection
 from utils.ImagePreprocess import preprocess_image, store_tiles
 from mysql.connector import Error
@@ -451,6 +451,41 @@ def update_user(user_id):
 
     except Exception as e:
         print(str(e))
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+@user_project_blueprint.route('/api/get_original_image', methods=['GET'])
+def get_original_image():
+    conn = None
+    cursor = None
+    try:
+        image_id = request.args.get('imageId')
+
+        if not image_id:
+            return jsonify({"error": "Missing imageId parameter"}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        query = """
+        SELECT image FROM my_image_db.OriginalImages WHERE ProjectId = %s
+        """
+        cursor.execute(query, (image_id,))
+        result = cursor.fetchone()
+        
+        if not result:
+            return jsonify({"error": "Image not found"}), 404
+
+        # Properly handle the binary image data
+        image_data = io.BytesIO(result['image'])
+        return send_file(image_data, mimetype='image/png')
+
+    except Exception as e:
         return jsonify({"error": str(e)}), 500
 
     finally:
