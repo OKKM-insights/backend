@@ -156,7 +156,7 @@ class MYSQLImageObjectDatabaseConnector(ImageObjectDatabaseConnector):
 
             query_label_ids = text("""
                                 SELECT * FROM Labels WHERE LabelID in 
-                                (SELECT LabelID FROM my_image_db_k.Labels_ImageObjects WHERE ImageObjectID = :imageobjectid);
+                                (SELECT LabelID FROM my_image_db.Labels_ImageObjects WHERE ImageObjectID = :imageobjectid);
                                    """)
             query_pixels = text("""SELECT x,y FROM Pixels_in_ImageObject WHERE ImageObjectID = :imageobjectid;
                                 """)

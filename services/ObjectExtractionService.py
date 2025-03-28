@@ -20,6 +20,9 @@ class ObjectExtractionService:
         self.icm_db = icm_db
         self.labeller_db = labeller_db
 
+   
+
+
     def get_objects(self, image: Image, Class: str, labellers: list[Labeller], labels: list[Label]) -> list[ImageObject]:
         # get objects for a given image and class
         image_data = np.asarray(image.image_data)
