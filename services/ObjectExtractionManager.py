@@ -58,5 +58,5 @@ class ObjectExtractionManager():
 
 
 t = ObjectExtractionManager(MYSQLProjectDatabaseConnector(),MYSQLLabelDatabaseConnector(), MYSQLLabellerDatabaseConnector(), MYSQLImageObjectDatabaseConnector_bb(), ObjectExtractionService(MYSQLImageClassMeasureDatabaseConnector(), MYSQLLabellerDatabaseConnector()))
-t.get_objects('64', 'plane')
+t.get_objects('66', 'plane')
 

@@ -111,18 +111,31 @@ class ObjectExtractionService:
                 int bot_right_y;
             };
             __global__ void update_likelihoods(double* likelihoods, double* helper_value_1, 
-                                                double* helper_value_2, bool* predictions, 
-                                                double alpha, double beta, int im_x, int im_y)
-            {
-                int index = blockIdx.x * blockDim.x + threadIdx.x;
-                if (index < im_x * im_y) {
+                                   double* helper_value_2, bool* predictions, 
+                                   double alpha, double beta, int im_x, int im_y)
+                {
+                    int index = blockIdx.x * blockDim.x + threadIdx.x;
+                    if (index >= im_x * im_y) return;  // Ensure valid index
+
                     float prediction = predictions[index] ? 1.0f : 0.0f;
-                    helper_value_1[index] *= tgamma(1-prediction+alpha) * tgamma(prediction+beta) / tgamma(1 + alpha + beta);
-                    helper_value_2[index] *= tgamma(prediction+alpha) * tgamma(1-prediction+beta) / tgamma(1 + alpha + beta);
-                    double denominator = helper_value_1[index] + helper_value_2[index] + 1e-9; 
-                    likelihoods[index] = helper_value_1[index] / denominator;
+
+                    double log_gamma_3 = lgamma(fmax(1 + alpha + beta, 1e-9));
+
+                    
+
+                    helper_value_1[index] *= exp(lgamma(fmax(1 - prediction + alpha, 1e-9)) + lgamma(fmax(prediction + beta, 1e-9)) - log_gamma_3);
+                    helper_value_2[index] *= exp(lgamma(fmax(prediction + alpha, 1e-9)) + lgamma(fmax(1 - prediction + beta, 1e-9)) - log_gamma_3);
+
+                    double denominator = helper_value_1[index] + helper_value_2[index] + 1e-9;  
+                    likelihoods[index] = helper_value_2[index] / denominator;
+
+                    // Debugging: Print some values
+                    //if (index % 1000 == 0) {
+                    //    printf("Index %d: helper_1=%f, helper_2=%f, likelihood=%f\\n", 
+                    //        index, helper_value_1[index], helper_value_2[index], likelihoods[index]);
+                    //}
                 }
-            }
+
                            
             __global__ void mark_predictions(bool* d_predictions, Small_Label* d_labels, int num_labels, int im_x, int im_y) {
                 int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -150,6 +163,9 @@ class ObjectExtractionService:
                                 label['top_left_y']+label['offset_y'],
                                 label['bot_right_x']+label['offset_x'],
                                 label['bot_right_y']+label['offset_y'])
+            
+        helper_values_1 = [[pixel[0] for pixel in row] for row in icm.helper_values]
+        helper_values_2 = [[pixel[1] for pixel in row] for row in icm.helper_values]
 
         d_labels = cuda.mem_alloc(small_labels.nbytes)
         size = icm.im_width*icm.im_height
@@ -158,9 +174,9 @@ class ObjectExtractionService:
         d_helper_value_1 = cuda.mem_alloc(size * np.float64().itemsize)  # Helper value 1
         d_helper_value_2 = cuda.mem_alloc(size * np.float64().itemsize)  # Helper value 2
 
-        cuda.memcpy_htod(d_likelihoods, np.array([x for xs in icm.likelihoods for x in xs]))
-        cuda.memcpy_htod(d_helper_value_1, np.array([x for xs in icm.helper_values[0] for x in xs]))
-        cuda.memcpy_htod(d_helper_value_2, np.array([x for xs in icm.helper_values[1] for x in xs]))
+        cuda.memcpy_htod(d_likelihoods, np.ascontiguousarray(icm.likelihoods, dtype=np.float64).ravel())
+        cuda.memcpy_htod(d_helper_value_1, np.ascontiguousarray(helper_values_1, dtype=np.float64).ravel())
+        cuda.memcpy_htod(d_helper_value_2, np.ascontiguousarray(helper_values_2, dtype=np.float64).ravel())
         cuda.memcpy_htod(d_labels, small_labels)
         cuda.memset_d8(d_predictions, 0, size * np.bool8().itemsize)
 
@@ -171,9 +187,12 @@ class ObjectExtractionService:
                      block=(block_size, 1, 1), grid=(num_blocks, 1))
         cuda.Context.synchronize()
 
+
         alpha = labeller.alpha
         beta = labeller.beta
 
+
+        num_blocks = (icm.im_height*icm.im_width + block_size - 1) // block_size
         update_likelihoods(d_likelihoods, d_helper_value_1, d_helper_value_2, d_predictions, 
                        np.float64(alpha), np.float64(beta), np.int32(icm.im_width), np.int32(icm.im_height),
                        block=(block_size, 1, 1), grid=(num_blocks, 1))
@@ -189,7 +208,7 @@ class ObjectExtractionService:
         cuda.memcpy_dtoh(helper_value_2, d_helper_value_2)
         cuda.memcpy_dtoh(preds, d_predictions)
 
-        
+        print("First 10 likelihood values after CUDA execution:", likelihoods[:10])
         icm.likelihoods = likelihoods.reshape(icm.im_width, icm.im_height)
         icm.helper_values = np.stack((helper_value_1.reshape(icm.im_width, icm.im_height), helper_value_2.reshape(icm.im_width, icm.im_height)), axis=-1)
 
@@ -311,18 +330,20 @@ class ObjectExtractionService:
         a:float = 0
         b:float = 0
         image_size = icm.im_height * icm.im_width
-
+        miss_count = 0
         for row in range(icm.im_height):
             for col in range(icm.im_width):
                 class_prediction = 1 if icm.likelihoods[row][col] > self.threshold else 0
                 if class_prediction == preds[row][col]:
                     a += icm.confidence[row][col]
                 else:
+                    miss_count += 1
                     b += icm.confidence[row][col]
         
         labeller.alpha += a/image_size
         labeller.beta += b/image_size
 
+        print(miss_count)
         print(labeller.alpha, labeller.beta)
 
 
