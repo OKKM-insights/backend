@@ -9,7 +9,8 @@ import pycuda.driver as cuda
 import pycuda.autoinit
 from pycuda.compiler import SourceModule
 import matplotlib.pyplot as plt
-
+import matplotlib.patches as patches
+import copy
 
 class ObjectExtractionService:
 
@@ -20,12 +21,71 @@ class ObjectExtractionService:
         self.icm_db = icm_db
         self.labeller_db = labeller_db
 
-    def get_objects(self, image: Image, Class: str, labellers: list[Labeller], labels: list[Label]) -> list[ImageObject_bb]:
+    def get_objects(self, image: Image, Class: str, labellers: list[Labeller], labels: list[Label], demo = False) -> list[ImageObject_bb]:
         # get objects for a given image and class
         image_data = np.asarray(image.image_data)
 
+        if demo:
+            # Init plotting ----------
+            fig = plt.figure(figsize=(18,9))
+            # color_bar_ax = plt.subplot2grid((2, 18), (0, 0), colspan=1, rowspan=2)
+            ax1 = plt.subplot2grid((2, 12), (0, 0), rowspan=2, colspan=5)
+
+            
+            ax2 = plt.subplot2grid((2, 12), (0, 6), colspan=3)  
+            ax3 = plt.subplot2grid((2, 12), (0, 9), colspan=3)  
+            ax4 = plt.subplot2grid((2, 12), (1, 6), colspan=3)  
+            ax5 = plt.subplot2grid((2, 12), (1, 9), colspan=3)  
+
+            axs = [ax1, ax2, ax3, ax4, ax5]
+            ax1.imshow(image_data)
+            ax2.imshow(image_data)
+            ax3.imshow(image_data)
+            ax4.imshow(image_data)
+            ax5.imshow(image_data)
+
+            ax2.axis('off')
+            ax3.axis('off')
+            ax4.axis('off')
+            ax5.axis('off')
+
+            ax1.set_title("User Created Labels")
+            ax2.set_title("Likelihood of Containing a Plane\n Based on Labels and User Skill")
+            ax3.set_title("Prediction of Regions Containing a Plane")
+            ax4.set_title("Confidence in Predictions")
+            ax5.set_title("Extracted Images for Training")
+
+            fig.savefig('demo.jpeg')
+            input('press enter to get Labels: ')
+            # -------
+
         labellers = pd.DataFrame([l.__dict__ for l in labellers])
         labels = pd.DataFrame([l.__dict__ for l in labels])
+
+
+        # plot labels -------------
+        if demo:
+            label_bbs=[]
+            for i, label in labels.iterrows():
+                rect = patches.Rectangle((label['top_left_x']+label['offset_x'], label['top_left_y']+label['offset_y']), label['bot_right_x'] - label['top_left_x'] , label['bot_right_y'] - label['top_left_y'], linewidth=2, color='r', fill=False)
+                label_bbs.append(rect)
+                ax1.add_patch(rect)
+            
+            ax1.set_title("User Created Labels")
+            fig.savefig('demo.jpeg')
+            input('press enter to display Likelihoods: ')
+            for patch in ax1.patches:
+                patch_cpy = copy.copy(patch)
+                patch.remove()
+                # cut the umbilical cord the hard way
+                patch_cpy.axes = None
+                patch_cpy.figure = None
+                patch_cpy.set_transform(ax2.transData)
+                ax2.add_patch(patch_cpy)
+            ax2.set_title("User Created Labels")
+            ax1.set_title("Likelihood of Containing a Plane\n Based on Labels and User Skill")
+            fig.savefig('demo.jpeg')
+        # -------
 
         # labels = labels[labels['Class'] == Class]
         labellers = labellers[labellers['skill']==Class]
@@ -48,9 +108,50 @@ class ObjectExtractionService:
                                                                      labeller['alpha'],
                                                                      labeller['beta']
                                                                      ))
-        
+        # -- Plot likelihoods & predictions --------
+        if demo:
+            im = ax1.imshow(icm.likelihoods, alpha=0.4, cmap='magma')
+            cb = fig.colorbar(im, ax=ax1, orientation='vertical', shrink=0.7)
+            plt.savefig('demo.jpeg')
+            input('press enter to plot predictions: ')
+            ax3.imshow(icm.likelihoods, alpha=0.4, cmap='magma')
+            ax3.set_title("Likelihood of Containing a Plane\n Based on Labels and User Skill")
+            ax1.set_title("Prediction of Regions Containing a Plane")
+            ax1.imshow(image_data)
+            cb.remove()
+            prediction = [[0] * icm.im_width for _ in range(icm.im_height)]
+
+            for row in range(len(icm.likelihoods)):
+                    for col in range(len(icm.likelihoods[0])):
+                        prediction[row][col] = 1 if icm.likelihoods[row][col] > self.threshold else 0
+
+            im = ax1.imshow(prediction, alpha=0.4, cmap='magma')
+            cb = fig.colorbar(im, ax=ax1, orientation='vertical', shrink=0.7)
+            plt.savefig('demo.jpeg')
+            input('press enter to plot Confidence: ')
+
+            ax4.imshow(prediction, alpha=0.4, cmap='magma')
+            ax4.set_title("Prediction of Regions Containing a Plane")
+            ax1.set_title("Confidence in Predictions")
+            ax1.imshow(image_data)
+            cb.remove()
+        # -----------------
+
         print(icm.likelihoods)
         self.__update_label_confidence(icm)
+
+        # -- Plot Confidence --------
+        if demo:
+            im = ax1.imshow(icm.confidence, alpha=0.4, cmap='viridis')
+            cb = fig.colorbar(im, ax=ax1, orientation='vertical', shrink=0.7)
+            plt.savefig('demo.jpeg')
+            input('press enter to get objects: ')
+            cb.remove()
+            ax5.imshow(icm.confidence, alpha=0.4, cmap='viridis')
+            ax5.set_title("Confidence in Predictions")
+            ax1.set_title("Extracted Images for Training")
+            ax1.imshow(image_data)
+        # -----------------
 
         for i, labeller in labellers.iterrows():
             id = labeller['LabellerID']
@@ -68,9 +169,15 @@ class ObjectExtractionService:
         print(f'found {len(groups)} groups')
         output = []
         for group in groups:
-            tlx, tly, brx, bry = extract_bounding_box(group)
+            tly, tlx, bry, brx = extract_bounding_box(group)
             print(tlx, tly, brx, bry)
             output.append(ImageObject_bb(None, image.ImageID, Class, 0,  tlx, tly, brx, bry))
+            if demo:
+                rect = patches.Rectangle((tlx, tly), brx-tlx , bry-tly, linewidth=2, color='g', fill=False)
+                ax1.add_patch(rect)
+
+        if demo:
+            plt.savefig('demo.jpeg')
 
         print("updating icm")
         self.icm_db.push_imageclassmeasure_images(icm)
@@ -152,14 +259,16 @@ class ObjectExtractionService:
         """)
         update_likelihoods = mod.get_function("update_likelihoods")
         mark_predictions = mod.get_function("mark_predictions")
-
+        print(labels, len(labels))
         Small_Label_dtype = np.dtype([('top_left_x', np.int32),
                               ('top_left_y', np.int32),
                               ('bot_right_x', np.int32),
                               ('bot_right_y', np.int32)])
         small_labels = np.empty(len(labels), dtype=Small_Label_dtype)
-        for i, label in labels.iterrows():
-            small_labels[i] = (label['top_left_x']+label['offset_x'],
+
+        
+        for i, label in labels.reset_index().iterrows():
+            small_labels[i-1] = (label['top_left_x']+label['offset_x'],
                                 label['top_left_y']+label['offset_y'],
                                 label['bot_right_x']+label['offset_x'],
                                 label['bot_right_y']+label['offset_y'])
@@ -212,10 +321,6 @@ class ObjectExtractionService:
         icm.likelihoods = likelihoods.reshape(icm.im_width, icm.im_height)
         icm.helper_values = np.stack((helper_value_1.reshape(icm.im_width, icm.im_height), helper_value_2.reshape(icm.im_width, icm.im_height)), axis=-1)
 
-        plt.imshow(icm.likelihoods)
-        plt.colorbar()
-        plt.savefig('temp.jpeg')
-        print(sum(preds)) 
 
         d_predictions.free()
         d_likelihoods.free()
@@ -296,7 +401,7 @@ class ObjectExtractionService:
                               ('bot_right_x', np.int32),
                               ('bot_right_y', np.int32)])
         small_labels = np.empty(len(labels), dtype=Small_Label_dtype)
-        for i, label in labels.iterrows():
+        for i, label in labels.reset_index().iterrows():
             small_labels[i] = (label['top_left_x']+label['offset_x'],
                                 label['top_left_y']+label['offset_y'],
                                 label['bot_right_x']+label['offset_x'],

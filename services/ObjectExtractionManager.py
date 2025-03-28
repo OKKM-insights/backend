@@ -23,7 +23,7 @@ class ObjectExtractionManager():
         self.object_service = object_service
         
     
-    def get_objects(self, project_id, Class):
+    def get_objects(self, project_id, Class, demo=False):
         t = time.time()
         query_projects = f"SELECT * FROM my_image_db.Projects WHERE projectId = {project_id};"
 
@@ -49,7 +49,7 @@ class ObjectExtractionManager():
             print(labellers)
             print(labels[0].__dict__)
 
-            objects.append(self.object_service.get_objects(image, Class, labellers, labels))
+            objects.append(self.object_service.get_objects(image, Class, labellers, labels, demo=demo))
 
         for object_list in objects:
             for ob in object_list:
@@ -58,5 +58,5 @@ class ObjectExtractionManager():
 
 
 t = ObjectExtractionManager(MYSQLProjectDatabaseConnector(),MYSQLLabelDatabaseConnector(), MYSQLLabellerDatabaseConnector(), MYSQLImageObjectDatabaseConnector_bb(), ObjectExtractionService(MYSQLImageClassMeasureDatabaseConnector(), MYSQLLabellerDatabaseConnector()))
-t.get_objects('66', 'plane')
+t.get_objects('66', 'plane', demo=False)
 
