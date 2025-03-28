@@ -116,10 +116,11 @@ class ObjectExtractionService:
             {
                 int index = blockIdx.x * blockDim.x + threadIdx.x;
                 if (index < im_x * im_y) {
-                    float prediction = float(predictions[index]);
+                    float prediction = predictions[index] ? 1.0f : 0.0f;
                     helper_value_1[index] *= tgamma(1-prediction+alpha) * tgamma(prediction+beta) / tgamma(1 + alpha + beta);
                     helper_value_2[index] *= tgamma(prediction+alpha) * tgamma(1-prediction+beta) / tgamma(1 + alpha + beta);
-                    likelihoods[index] = helper_value_1[index] / (helper_value_1[index] + helper_value_2[index]);
+                    double denominator = helper_value_1[index] + helper_value_2[index] + 1e-9; 
+                    likelihoods[index] = helper_value_1[index] / denominator;
                 }
             }
                            
@@ -195,7 +196,7 @@ class ObjectExtractionService:
         plt.imshow(icm.likelihoods)
         plt.colorbar()
         plt.savefig('temp.jpeg')
-        print(preds) 
+        print(sum(preds)) 
 
         d_predictions.free()
         d_likelihoods.free()
