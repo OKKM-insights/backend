@@ -163,3 +163,5 @@ cython_debug/
 
 .DS_Store
 services/tmp_img.png
+temp.jpeg
+.vscode/settings.json

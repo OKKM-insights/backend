@@ -1,5 +1,7 @@
 import uuid
 from PIL import Image as pilImage
+from PIL import ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 class Label():
     LabelID: str
@@ -106,7 +108,39 @@ class ImageObject():
         self.Class = Class
         self.Confidence = Confidence
 
+class ImageObject_bb():
+    ImageObjectID: str
+    ImageID: str
+    Class: str
+    Confidence: float
+    top_left_x: int
+    top_left_y: int
+    bot_right_x:int
+    bot_right_y:int
+    
+    def __init__(self,
+                 ImageObjectID:str = None,
+                 ImageID:str = None,
+                 Class: str = None,
+                 Confidence: float = None,
+                 top_left_x: int=None,
+                top_left_y: int=None,
+                bot_right_x:int=None,
+                bot_right_y:int=None):
+        if not ImageObjectID:
+            self.ImageObjectID = str(uuid.uuid4())
+        else:
+            self.ImageObjectID = ImageObjectID
 
+
+        self.ImageID = ImageID
+        self.Class = Class
+        self.Confidence = Confidence
+
+        self.top_left_x = top_left_x
+        self.top_left_y = top_left_y
+        self.bot_right_x = bot_right_x
+        self.bot_right_y = bot_right_y
 
 class Image():
     ImageID: str

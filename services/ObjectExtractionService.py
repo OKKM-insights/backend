@@ -1,10 +1,16 @@
-from DataTypes import ImageObject, Labeller, Label, Image, ImageClassMeasure
+from DataTypes import ImageObject_bb, Labeller, Label, Image, ImageClassMeasure
 import numpy as np
 import pandas as pd
 from ImageClassMeasureDatabaseConnector import ImageClassMeasureDatabaseConnector, MYSQLImageClassMeasureDatabaseConnector
 from scipy.special import beta
 from collections import deque
 from LabellerDatabaseConnector import LabellerDatabaseConnector
+import pycuda.driver as cuda
+import pycuda.autoinit
+from pycuda.compiler import SourceModule
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import copy
 
 class ObjectExtractionService:
 
@@ -15,12 +21,71 @@ class ObjectExtractionService:
         self.icm_db = icm_db
         self.labeller_db = labeller_db
 
-    def get_objects(self, image: Image, Class: str, labellers: list[Labeller], labels: list[Label]) -> list[ImageObject]:
+    def get_objects(self, image: Image, Class: str, labellers: list[Labeller], labels: list[Label], demo = False) -> list[ImageObject_bb]:
         # get objects for a given image and class
         image_data = np.asarray(image.image_data)
 
+        if demo:
+            # Init plotting ----------
+            fig = plt.figure(figsize=(18,9))
+            # color_bar_ax = plt.subplot2grid((2, 18), (0, 0), colspan=1, rowspan=2)
+            ax1 = plt.subplot2grid((2, 12), (0, 0), rowspan=2, colspan=5)
+
+            
+            ax2 = plt.subplot2grid((2, 12), (0, 6), colspan=3)  
+            ax3 = plt.subplot2grid((2, 12), (0, 9), colspan=3)  
+            ax4 = plt.subplot2grid((2, 12), (1, 6), colspan=3)  
+            ax5 = plt.subplot2grid((2, 12), (1, 9), colspan=3)  
+
+            axs = [ax1, ax2, ax3, ax4, ax5]
+            ax1.imshow(image_data)
+            ax2.imshow(image_data)
+            ax3.imshow(image_data)
+            ax4.imshow(image_data)
+            ax5.imshow(image_data)
+
+            ax2.axis('off')
+            ax3.axis('off')
+            ax4.axis('off')
+            ax5.axis('off')
+
+            ax1.set_title("User Created Labels")
+            ax2.set_title("Likelihood of Containing a Plane\n Based on Labels and User Skill")
+            ax3.set_title("Prediction of Regions Containing a Plane")
+            ax4.set_title("Confidence in Predictions")
+            ax5.set_title("Extracted Images for Training")
+
+            fig.savefig('demo.jpeg')
+            input('press enter to get Labels: ')
+            # -------
+
         labellers = pd.DataFrame([l.__dict__ for l in labellers])
         labels = pd.DataFrame([l.__dict__ for l in labels])
+
+
+        # plot labels -------------
+        if demo:
+            label_bbs=[]
+            for i, label in labels.iterrows():
+                rect = patches.Rectangle((label['top_left_x']+label['offset_x'], label['top_left_y']+label['offset_y']), label['bot_right_x'] - label['top_left_x'] , label['bot_right_y'] - label['top_left_y'], linewidth=2, color='r', fill=False)
+                label_bbs.append(rect)
+                ax1.add_patch(rect)
+            
+            ax1.set_title("User Created Labels")
+            fig.savefig('demo.jpeg')
+            input('press enter to display Likelihoods: ')
+            for patch in ax1.patches:
+                patch_cpy = copy.copy(patch)
+                patch.remove()
+                # cut the umbilical cord the hard way
+                patch_cpy.axes = None
+                patch_cpy.figure = None
+                patch_cpy.set_transform(ax2.transData)
+                ax2.add_patch(patch_cpy)
+            ax2.set_title("User Created Labels")
+            ax1.set_title("Likelihood of Containing a Plane\n Based on Labels and User Skill")
+            fig.savefig('demo.jpeg')
+        # -------
 
         # labels = labels[labels['Class'] == Class]
         labellers = labellers[labellers['skill']==Class]
@@ -38,13 +103,55 @@ class ObjectExtractionService:
         for i, labeller in labellers.iterrows(): 
             print(f'applying label group {i}')
             tmp_labels = labels[labels['LabellerID'] == labeller['LabellerID']]
-            self.__update_label_likelihood(icm, tmp_labels, Labeller(labeller['LabellerID'],
+            self.__cuda_update_label_likelihood(icm, tmp_labels, Labeller(labeller['LabellerID'],
                                                                      labeller['skill'],
                                                                      labeller['alpha'],
                                                                      labeller['beta']
                                                                      ))
-        
+        # -- Plot likelihoods & predictions --------
+        if demo:
+            im = ax1.imshow(icm.likelihoods, alpha=0.4, cmap='magma')
+            cb = fig.colorbar(im, ax=ax1, orientation='vertical', shrink=0.7)
+            plt.savefig('demo.jpeg')
+            input('press enter to plot predictions: ')
+            ax3.imshow(icm.likelihoods, alpha=0.4, cmap='magma')
+            ax3.set_title("Likelihood of Containing a Plane\n Based on Labels and User Skill")
+            ax1.set_title("Prediction of Regions Containing a Plane")
+            ax1.imshow(image_data)
+            cb.remove()
+            prediction = [[0] * icm.im_width for _ in range(icm.im_height)]
+
+            for row in range(len(icm.likelihoods)):
+                    for col in range(len(icm.likelihoods[0])):
+                        prediction[row][col] = 1 if icm.likelihoods[row][col] > self.threshold else 0
+
+            im = ax1.imshow(prediction, alpha=0.4, cmap='magma')
+            cb = fig.colorbar(im, ax=ax1, orientation='vertical', shrink=0.7)
+            plt.savefig('demo.jpeg')
+            input('press enter to plot Confidence: ')
+
+            ax4.imshow(prediction, alpha=0.4, cmap='magma')
+            ax4.set_title("Prediction of Regions Containing a Plane")
+            ax1.set_title("Confidence in Predictions")
+            ax1.imshow(image_data)
+            cb.remove()
+        # -----------------
+
+        print(icm.likelihoods)
         self.__update_label_confidence(icm)
+
+        # -- Plot Confidence --------
+        if demo:
+            im = ax1.imshow(icm.confidence, alpha=0.4, cmap='viridis')
+            cb = fig.colorbar(im, ax=ax1, orientation='vertical', shrink=0.7)
+            plt.savefig('demo.jpeg')
+            input('press enter to get objects: ')
+            cb.remove()
+            ax5.imshow(icm.confidence, alpha=0.4, cmap='viridis')
+            ax5.set_title("Confidence in Predictions")
+            ax1.set_title("Extracted Images for Training")
+            ax1.imshow(image_data)
+        # -----------------
 
         for i, labeller in labellers.iterrows():
             id = labeller['LabellerID']
@@ -55,27 +162,33 @@ class ObjectExtractionService:
                                                                      labeller['alpha'],
                                                                      labeller['beta']
                                                                      )
-            self.__update_labeler_accuracy(icm, tmp_labels, l)
+            self.__cuda_update_labeller_accuracy(icm, tmp_labels, l)
             self.labeller_db.push_labeller(l)
+        print(icm.likelihoods)
         groups = self.__find_connected_groups(icm.likelihoods)
         print(f'found {len(groups)} groups')
         output = []
         for group in groups:
-            min_confidence = 1
-            for pixel in group:
-                if min_confidence > icm.confidence[pixel[1]][pixel[0]]:
-                    min_confidence = icm.confidence[pixel[1]][pixel[0]]
-            output.append(ImageObject(None, image.ImageID, Class, min_confidence, group, [Label()]))
+            tly, tlx, bry, brx = extract_bounding_box(group)
+            print(tlx, tly, brx, bry)
+            output.append(ImageObject_bb(None, image.ImageID, Class, 0,  tlx, tly, brx, bry))
+            if demo:
+                rect = patches.Rectangle((tlx, tly), brx-tlx , bry-tly, linewidth=2, color='g', fill=False)
+                ax1.add_patch(rect)
 
-        self.icm_db.push_imageclassmeasure(icm)
+        if demo:
+            plt.savefig('demo.jpeg')
 
+        print("updating icm")
+        self.icm_db.push_imageclassmeasure_images(icm)
+        print("icm updated")
         return output
 
     def __get_icm(self, imageID: str, Class: str) -> ImageClassMeasure:
         query = f"""
-            SELECT * FROM ImageClassMeasure Where ImageID = '{imageID}' and Label = '{Class}';
+            SELECT * FROM ImageClassMeasure_images Where ImageID = '{imageID}' and Label = '{Class}';
         """
-        return self.icm_db.get_imageclassmeasures(query)
+        return self.icm_db.get_imageclassmeasures_images(query)
 
 
     def __update_label_likelihood(self, icm: ImageClassMeasure, labels:pd.DataFrame, labeller: Labeller):
@@ -95,11 +208,146 @@ class ObjectExtractionService:
                 icm.helper_values[row][col][1] *= beta(class_prediction + a, 1-class_prediction + b)
                 icm.likelihoods[row][col] = icm.helper_values[row][col][1] / (icm.helper_values[row][col][1] + icm.helper_values[row][col][0])
 
+    def __cuda_update_label_likelihood(self, icm: ImageClassMeasure, labels:pd.DataFrame, labeller: Labeller):
+        mod = SourceModule("""
+                           #define CUDA_PRINTF
+            struct Small_Label {
+                int top_left_x;
+                int top_left_y;
+                int bot_right_x;
+                int bot_right_y;
+            };
+            __global__ void update_likelihoods(double* likelihoods, double* helper_value_1, 
+                                   double* helper_value_2, bool* predictions, 
+                                   double alpha, double beta, int im_x, int im_y)
+                {
+                    int index = blockIdx.x * blockDim.x + threadIdx.x;
+                    if (index >= im_x * im_y) return;  // Ensure valid index
+
+                    float prediction = predictions[index] ? 1.0f : 0.0f;
+
+                    double log_gamma_3 = lgamma(fmax(1 + alpha + beta, 1e-9));
+
+                    
+
+                    helper_value_1[index] *= exp(lgamma(fmax(1 - prediction + alpha, 1e-9)) + lgamma(fmax(prediction + beta, 1e-9)) - log_gamma_3);
+                    helper_value_2[index] *= exp(lgamma(fmax(prediction + alpha, 1e-9)) + lgamma(fmax(1 - prediction + beta, 1e-9)) - log_gamma_3);
+
+                    double denominator = helper_value_1[index] + helper_value_2[index] + 1e-9;  
+                    likelihoods[index] = helper_value_2[index] / denominator;
+
+                    // Debugging: Print some values
+                    //if (index % 1000 == 0) {
+                    //    printf("Index %d: helper_1=%f, helper_2=%f, likelihood=%f\\n", 
+                    //        index, helper_value_1[index], helper_value_2[index], likelihoods[index]);
+                    //}
+                }
+
+                           
+            __global__ void mark_predictions(bool* d_predictions, Small_Label* d_labels, int num_labels, int im_x, int im_y) {
+                int idx = blockIdx.x * blockDim.x + threadIdx.x;
+                if (idx >= num_labels) return;
+
+                Small_Label l = d_labels[idx];
+
+                for (int row = l.top_left_y; row <= l.bot_right_y; row++) {
+                    for (int col = l.top_left_x; col <= l.bot_right_x; col++) {
+                        d_predictions[row * im_x + col] = true;
+                    }
+                }
+            }
+        """)
+        update_likelihoods = mod.get_function("update_likelihoods")
+        mark_predictions = mod.get_function("mark_predictions")
+        print(labels, len(labels))
+        Small_Label_dtype = np.dtype([('top_left_x', np.int32),
+                              ('top_left_y', np.int32),
+                              ('bot_right_x', np.int32),
+                              ('bot_right_y', np.int32)])
+        small_labels = np.empty(len(labels), dtype=Small_Label_dtype)
+
+        
+        for i, label in labels.reset_index().iterrows():
+            small_labels[i-1] = (label['top_left_x']+label['offset_x'],
+                                label['top_left_y']+label['offset_y'],
+                                label['bot_right_x']+label['offset_x'],
+                                label['bot_right_y']+label['offset_y'])
+            
+        helper_values_1 = [[pixel[0] for pixel in row] for row in icm.helper_values]
+        helper_values_2 = [[pixel[1] for pixel in row] for row in icm.helper_values]
+
+        d_labels = cuda.mem_alloc(small_labels.nbytes)
+        size = icm.im_width*icm.im_height
+        d_predictions = cuda.mem_alloc(size * np.bool8().itemsize)  # Boolean predictions array
+        d_likelihoods = cuda.mem_alloc(size * np.float64().itemsize)  # Likelihoods array
+        d_helper_value_1 = cuda.mem_alloc(size * np.float64().itemsize)  # Helper value 1
+        d_helper_value_2 = cuda.mem_alloc(size * np.float64().itemsize)  # Helper value 2
+
+        cuda.memcpy_htod(d_likelihoods, np.ascontiguousarray(icm.likelihoods, dtype=np.float64).ravel())
+        cuda.memcpy_htod(d_helper_value_1, np.ascontiguousarray(helper_values_1, dtype=np.float64).ravel())
+        cuda.memcpy_htod(d_helper_value_2, np.ascontiguousarray(helper_values_2, dtype=np.float64).ravel())
+        cuda.memcpy_htod(d_labels, small_labels)
+        cuda.memset_d8(d_predictions, 0, size * np.bool8().itemsize)
+
+        block_size = 256
+        num_blocks = (len(labels) + block_size - 1) // block_size
+
+        mark_predictions(d_predictions, d_labels, np.int32(len(labels)), np.int32(icm.im_width), np.int32(icm.im_height),
+                     block=(block_size, 1, 1), grid=(num_blocks, 1))
+        cuda.Context.synchronize()
+
+
+        alpha = labeller.alpha
+        beta = labeller.beta
+
+
+        num_blocks = (icm.im_height*icm.im_width + block_size - 1) // block_size
+        update_likelihoods(d_likelihoods, d_helper_value_1, d_helper_value_2, d_predictions, 
+                       np.float64(alpha), np.float64(beta), np.int32(icm.im_width), np.int32(icm.im_height),
+                       block=(block_size, 1, 1), grid=(num_blocks, 1))
+        cuda.Context.synchronize()
+
+        likelihoods = np.empty(size, dtype=np.float64)
+        helper_value_1 = np.empty(size, dtype=np.float64)
+        helper_value_2 = np.empty(size, dtype=np.float64)
+        preds = np.empty(size, dtype=np.bool8)
+
+        cuda.memcpy_dtoh(likelihoods, d_likelihoods)
+        cuda.memcpy_dtoh(helper_value_1, d_helper_value_1)
+        cuda.memcpy_dtoh(helper_value_2, d_helper_value_2)
+        cuda.memcpy_dtoh(preds, d_predictions)
+
+        print("First 10 likelihood values after CUDA execution:", likelihoods[:10])
+        icm.likelihoods = likelihoods.reshape(icm.im_width, icm.im_height)
+        icm.helper_values = np.stack((helper_value_1.reshape(icm.im_width, icm.im_height), helper_value_2.reshape(icm.im_width, icm.im_height)), axis=-1)
+
+
+        d_predictions.free()
+        d_likelihoods.free()
+        d_helper_value_1.free()
+        d_helper_value_2.free()
+        d_labels.free()
+
+
+
     def __update_label_confidence(self, icm: ImageClassMeasure):
         for row in range(icm.im_height):
             for col in range(icm.im_width):
                 prediction = 1 if icm.likelihoods[row][col] > self.threshold else 0
                 icm.confidence[row][col] = abs(icm.likelihoods[row][col] - 1 + prediction)
+
+    def __cuda_update_label_confidence(self, icm: ImageClassMeasure):
+        mod = SourceModule("""
+            __global__ void update_confidence(double* likelihoods, double* confidence, 
+                                                double threshold, int im_x, int im_y)
+            {
+                int index = blockIdx.x * blockDim.x + threadIdx.x;
+                if (index < im_x * im_y) {
+                    confidence[index] = abs(likelihoods[index]-1 + (likelihoods[index] > threshold));
+                }
+            }
+                           
+        """)
 
     def __update_labeler_accuracy(self, icm: ImageClassMeasure, labels:pd.DataFrame, labeller: Labeller):
         # update agent accuracy based on proportion of pixels correctly labeled
@@ -123,6 +371,88 @@ class ObjectExtractionService:
         labeller.alpha += a/image_size
         labeller.beta += b/image_size
 
+    def __cuda_update_labeller_accuracy(self, icm: ImageClassMeasure, labels:pd.DataFrame, labeller: Labeller):
+        mod = SourceModule("""
+                           #define CUDA_PRINTF
+            struct Small_Label {
+                int top_left_x;
+                int top_left_y;
+                int bot_right_x;
+                int bot_right_y;
+            };
+                           
+            __global__ void mark_predictions(bool* d_predictions, Small_Label* d_labels, int num_labels, int im_x, int im_y) {
+                int idx = blockIdx.x * blockDim.x + threadIdx.x;
+                if (idx >= num_labels) return;
+
+                Small_Label l = d_labels[idx];
+
+                for (int row = l.top_left_y; row <= l.bot_right_y; row++) {
+                    for (int col = l.top_left_x; col <= l.bot_right_x; col++) {
+                        d_predictions[row * im_x + col] = true;
+                    }
+                }
+            }
+        """)
+        mark_predictions = mod.get_function("mark_predictions")
+
+        Small_Label_dtype = np.dtype([('top_left_x', np.int32),
+                              ('top_left_y', np.int32),
+                              ('bot_right_x', np.int32),
+                              ('bot_right_y', np.int32)])
+        small_labels = np.empty(len(labels), dtype=Small_Label_dtype)
+        for i, label in labels.reset_index().iterrows():
+            small_labels[i] = (label['top_left_x']+label['offset_x'],
+                                label['top_left_y']+label['offset_y'],
+                                label['bot_right_x']+label['offset_x'],
+                                label['bot_right_y']+label['offset_y'])
+
+        d_labels = cuda.mem_alloc(small_labels.nbytes)
+        
+        size = icm.im_width*icm.im_height
+        d_predictions = cuda.mem_alloc(size * np.bool8().itemsize)  # Boolean predictions array
+        cuda.memcpy_htod(d_labels, small_labels)
+        cuda.memset_d8(d_predictions, 0, size * np.bool8().itemsize)
+
+        block_size = 256
+        num_blocks = (len(labels) + block_size - 1) // block_size
+
+        mark_predictions(d_predictions, d_labels, np.int32(len(labels)), np.int32(icm.im_width), np.int32(icm.im_height),
+                     block=(block_size, 1, 1), grid=(num_blocks, 1))
+        cuda.Context.synchronize()
+        
+
+
+
+        preds = np.empty(size, dtype=np.bool8)
+        cuda.memcpy_dtoh(preds, d_predictions)
+        preds = preds.reshape(icm.im_width, icm.im_height)
+
+        d_predictions.free()
+        d_labels.free()
+
+
+        a:float = 0
+        b:float = 0
+        image_size = icm.im_height * icm.im_width
+        miss_count = 0
+        for row in range(icm.im_height):
+            for col in range(icm.im_width):
+                class_prediction = 1 if icm.likelihoods[row][col] > self.threshold else 0
+                if class_prediction == preds[row][col]:
+                    a += icm.confidence[row][col]
+                else:
+                    miss_count += 1
+                    b += icm.confidence[row][col]
+        
+        labeller.alpha += a/image_size
+        labeller.beta += b/image_size
+
+        print(miss_count)
+        print(labeller.alpha, labeller.beta)
+
+
+
 
     def __find_connected_groups(self, grid):
         """
@@ -132,8 +462,9 @@ class ObjectExtractionService:
         :param threshold: Minimum value for a pixel to be included in a group
         :return: List of groups, where each group is a list of (x, y) coordinates
         """
-        if not grid or not grid[0]:  # Handle empty input
-            return []
+        print(grid)
+        # if not grid or not grid[0]:  # Handle empty input
+        #     return []
 
         rows, cols = len(grid), len(grid[0])
         visited = set()  # Keep track of visited pixels
@@ -171,6 +502,21 @@ class ObjectExtractionService:
 
         return groups
 
+def extract_bounding_box(pixels):
+    # Convert list of pixels to a numpy array for efficient computation
+    pixels_np = np.array(pixels)
+    
+    # Extract x and y coordinates
+    x_coords = pixels_np[:, 0]
+    y_coords = pixels_np[:, 1]
+    
+    # Calculate the bounding box
+    top_left_x = np.min(x_coords)
+    top_left_y = np.min(y_coords)
+    bot_right_x = np.max(x_coords)
+    bot_right_y = np.max(y_coords)
+    
+    return top_left_x, top_left_y, bot_right_x, bot_right_y
 # o = ObjectExtractionService()
 # i = Image('1','2','1')
 # ls = [Labeller('t', 'boat','1.1','1.2'),
