@@ -277,20 +277,22 @@ def get_client_projects():
         today = date.today()
 
         query = """
-        SELECT 
-            p.projectId AS id, 
-            p.name AS title, 
-            p.description, 
-            CEIL(IFNULL(labeled_count, 0)) AS progress
-        FROM Projects p
-        LEFT JOIN (
-            SELECT i.project_id, COUNT(l.ImageID) AS labeled_count
-            FROM Labels l
-            JOIN Images i ON l.ImageID = i.id
-            GROUP BY i.project_id
-        ) labeled ON p.projectId = labeled.project_id
-        WHERE p.endDate >= %s AND p.clientId = %s
-        """
+            SELECT 
+                p.projectId AS id, 
+                p.name AS title, 
+                p.description, 
+                IFNULL(ROUND((high_conf_count / NULLIF(total_count, 0)) * 100), 0) AS progress
+            FROM Projects p
+            LEFT JOIN (
+                SELECT 
+                    i.project_id, 
+                    COUNT(CASE WHEN i.confidence > 0.8 THEN 1 END) AS high_conf_count,
+                    COUNT(*) AS total_count
+                FROM Images i
+                GROUP BY i.project_id
+            ) img_stats ON p.projectId = img_stats.project_id
+            WHERE p.endDate >= %s AND p.clientId = %s
+            """
         cursor.execute(query, (today, client_id))
 
         
