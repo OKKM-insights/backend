@@ -1,16 +1,26 @@
-from DataTypes import ImageObject_bb, Labeller, Label, Image, ImageClassMeasure
+
+import sys
+from pathlib import Path
+
+project_root = str(Path(__file__).parent.parent)
+sys.path.append(project_root)
+from services.DataTypes import ImageObject_bb, Labeller, Label, Image, ImageClassMeasure
+
 import numpy as np
 import pandas as pd
-from ImageClassMeasureDatabaseConnector import ImageClassMeasureDatabaseConnector, MYSQLImageClassMeasureDatabaseConnector
+from services.ImageClassMeasureDatabaseConnector import ImageClassMeasureDatabaseConnector, MYSQLImageClassMeasureDatabaseConnector
 from scipy.special import beta
 from collections import deque
-from LabellerDatabaseConnector import LabellerDatabaseConnector
+
+from services.LabellerDatabaseConnector import LabellerDatabaseConnector
+
 import pycuda.driver as cuda
 import pycuda.autoinit
 from pycuda.compiler import SourceModule
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import copy
+
 
 class ObjectExtractionService:
 
@@ -20,6 +30,7 @@ class ObjectExtractionService:
         self.threshold = threshold
         self.icm_db = icm_db
         self.labeller_db = labeller_db
+
 
     def get_objects(self, image: Image, Class: str, labellers: list[Labeller], labels: list[Label], demo = False) -> list[ImageObject_bb]:
         # get objects for a given image and class
