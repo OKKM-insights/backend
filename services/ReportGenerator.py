@@ -1,9 +1,15 @@
-from ProjectDatabaseConnector import ProjectDatabaseConnector, MYSQLProjectDatabaseConnector
-from LabelDatabaseConnector import LabelDatabaseConnector, MYSQLLabelDatabaseConnector
-from LabellerDatabaseConnector import LabellerDatabaseConnector, MYSQLLabellerDatabaseConnector
-from ImageObjectDatabaseConnector import ImageObjectDatabaseConnector, MYSQLImageObjectDatabaseConnector
-from ObjectExtractionService import ObjectExtractionService
-from ImageClassMeasureDatabaseConnector import MYSQLImageClassMeasureDatabaseConnector
+import sys
+from pathlib import Path
+
+project_root = str(Path(__file__).parent.parent)
+sys.path.append(project_root)
+
+from services.ProjectDatabaseConnector import ProjectDatabaseConnector, MYSQLProjectDatabaseConnector
+from services.LabelDatabaseConnector import LabelDatabaseConnector, MYSQLLabelDatabaseConnector
+from services.LabellerDatabaseConnector import LabellerDatabaseConnector, MYSQLLabellerDatabaseConnector
+from services.ImageObjectDatabaseConnector import ImageObjectDatabaseConnector, MYSQLImageObjectDatabaseConnector
+from services.ObjectExtractionService import ObjectExtractionService
+from services.ImageClassMeasureDatabaseConnector import MYSQLImageClassMeasureDatabaseConnector
 import json
 
 class ReportGenerator():
@@ -120,7 +126,8 @@ class ReportGenerator():
                 },
             }
         }
-        return json.dumps(response)
+        return json.dumps(response, default=lambda o: o.__dict__ if hasattr(o, '__dict__') else str(o))
+
 
 
             
