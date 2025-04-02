@@ -6,7 +6,11 @@ import uuid
 import time
 import datetime
 import json
-from DataTypes import ImageObject_bb, Label
+import sys
+from pathlib import Path
+project_root = str(Path(__file__).parent.parent)
+sys.path.append(project_root)
+from services.DataTypes import ImageObject_bb, Label
 import urllib.parse
 import pymysql
 
