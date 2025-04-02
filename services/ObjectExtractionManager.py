@@ -1,3 +1,4 @@
+
 import sys
 from pathlib import Path
 import numpy as np
@@ -12,6 +13,7 @@ from services.ObjectExtractionService import ObjectExtractionService
 from services.ImageClassMeasureDatabaseConnector import MYSQLImageClassMeasureDatabaseConnector
 from services.DataTypes import Labeller
 
+
 class ObjectExtractionManager():
 
 
@@ -19,7 +21,7 @@ class ObjectExtractionManager():
                  project_db: ProjectDatabaseConnector,
                  label_db: LabelDatabaseConnector,
                  labeller_db: LabellerDatabaseConnector,
-                 imageobject_db: ImageObjectDatabaseConnector,
+                 imageobject_db: ImageObjectDatabaseConnector_bb,
                  object_service: ObjectExtractionService):
         self.project_db = project_db
         self.label_db = label_db
@@ -58,6 +60,7 @@ class ObjectExtractionManager():
         else:
             return None
     
+
     def get_consensus_bbox(image, labels, threshold=0.5):
         # Get image shape from the PIL image object:
         image_shape = (image.image_data.height, image.image_data.width)
@@ -69,7 +72,10 @@ class ObjectExtractionManager():
             print("No consensus bounding box found.")
         return bbox
 
-    def get_objects(self, project_id, Class):
+
+    def get_objects(self, project_id, Class, demo=False):
+        t = time.time()
+
         query_projects = f"SELECT * FROM my_image_db.Projects WHERE projectId = {project_id};"
 
         project = self.project_db.get_projects(query_projects)[0]
@@ -94,14 +100,14 @@ class ObjectExtractionManager():
             print(labellers)
             print(labels[0].__dict__)
 
-            objects.append(self.object_service.get_objects(image, Class, labellers, labels))
+            objects.append(self.object_service.get_objects(image, Class, labellers, labels, demo=demo))
 
         for object_list in objects:
             for ob in object_list:
                 self.imageobject_db.push_imageobject(ob)
+        print(f"completed in {time.time()-t} seconds")
 
 
-
-t = ObjectExtractionManager(MYSQLProjectDatabaseConnector(),MYSQLLabelDatabaseConnector(), MYSQLLabellerDatabaseConnector(), MYSQLImageObjectDatabaseConnector(), ObjectExtractionService(MYSQLImageClassMeasureDatabaseConnector(), MYSQLLabellerDatabaseConnector()))
-t.get_objects('14', 'plane')
+t = ObjectExtractionManager(MYSQLProjectDatabaseConnector(),MYSQLLabelDatabaseConnector(), MYSQLLabellerDatabaseConnector(), MYSQLImageObjectDatabaseConnector_bb(), ObjectExtractionService(MYSQLImageClassMeasureDatabaseConnector(), MYSQLLabellerDatabaseConnector()))
+t.get_objects('66', 'plane', demo=False)
 

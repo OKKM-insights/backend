@@ -1,7 +1,7 @@
 import os
 import base64
 import bcrypt
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
 from services.core_img_db_connector import get_db_connection
 from utils.ImagePreprocess import preprocess_image, store_tiles
 from mysql.connector import Error
@@ -277,20 +277,22 @@ def get_client_projects():
         today = date.today()
 
         query = """
-        SELECT 
-            p.projectId AS id, 
-            p.name AS title, 
-            p.description, 
-            CEIL(IFNULL(labeled_count, 0)) AS progress
-        FROM Projects p
-        LEFT JOIN (
-            SELECT i.project_id, COUNT(l.ImageID) AS labeled_count
-            FROM Labels l
-            JOIN Images i ON l.ImageID = i.id
-            GROUP BY i.project_id
-        ) labeled ON p.projectId = labeled.project_id
-        WHERE p.endDate >= %s AND p.clientId = %s
-        """
+            SELECT 
+                p.projectId AS id, 
+                p.name AS title, 
+                p.description, 
+                IFNULL(ROUND((high_conf_count / NULLIF(total_count, 0)) * 100), 0) AS progress
+            FROM Projects p
+            LEFT JOIN (
+                SELECT 
+                    i.project_id, 
+                    COUNT(CASE WHEN i.confidence > 0.8 THEN 1 END) AS high_conf_count,
+                    COUNT(*) AS total_count
+                FROM Images i
+                GROUP BY i.project_id
+            ) img_stats ON p.projectId = img_stats.project_id
+            WHERE p.endDate >= %s AND p.clientId = %s
+            """
         cursor.execute(query, (today, client_id))
 
         
@@ -340,6 +342,7 @@ def get_images():
                 FROM Images i
                 LEFT JOIN Labels l ON i.id = l.ImageID AND l.LabellerID = %s
                 WHERE i.project_id = %s AND l.ImageID IS NULL
+                ORDER BY i.confidence ASC
                 LIMIT %s OFFSET %s
                 """
             cursor.execute(query, (user_id, project_id, limit, offset))
@@ -450,6 +453,41 @@ def update_user(user_id):
 
     except Exception as e:
         print(str(e))
+        return jsonify({"error": str(e)}), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+@user_project_blueprint.route('/api/get_original_image', methods=['GET'])
+def get_original_image():
+    conn = None
+    cursor = None
+    try:
+        image_id = request.args.get('projectId')
+
+        if not image_id:
+            return jsonify({"error": "Missing imageId parameter"}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        query = """
+        SELECT image FROM my_image_db.OriginalImages WHERE ProjectId = %s
+        """
+        cursor.execute(query, (image_id,))
+        result = cursor.fetchone()
+        
+        if not result:
+            return jsonify({"error": "Image not found"}), 404
+
+        # Properly handle the binary image data
+        image_data = io.BytesIO(result['image'])
+        return send_file(image_data, mimetype='image/png')
+
+    except Exception as e:
         return jsonify({"error": str(e)}), 500
 
     finally:
