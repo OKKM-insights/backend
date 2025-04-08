@@ -10,7 +10,11 @@ from api.account_routes import user_project_blueprint
 
 def create_app():
     app = Flask(__name__)
-    CORS(app, resources={r"/api/*": {"origins": ["https://orbitwatch.xyz", "http://localhost:3000"]}})
+    CORS(app, resources={r"/api/*": {"origins": [
+        "https://orbitwatch.xyz", 
+        "http://localhost:3000",
+        r"^https://deploy-preview-\d+--okkm\.netlify\.app$"
+        ]}})
     app.register_blueprint(image_blueprint)
     app.register_blueprint(user_project_blueprint)
     print("launched")
