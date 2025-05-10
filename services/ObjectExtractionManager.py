@@ -1,4 +1,5 @@
-
+from __future__ import annotations
+import time
 import sys
 from pathlib import Path
 import numpy as np
@@ -108,6 +109,12 @@ class ObjectExtractionManager():
         print(f"completed in {time.time()-t} seconds")
 
 
-t = ObjectExtractionManager(MYSQLProjectDatabaseConnector(),MYSQLLabelDatabaseConnector(), MYSQLLabellerDatabaseConnector(), MYSQLImageObjectDatabaseConnector_bb(), ObjectExtractionService(MYSQLImageClassMeasureDatabaseConnector(), MYSQLLabellerDatabaseConnector()))
-t.get_objects('66', 'plane', demo=False)
-
+if __name__ == "__main__":
+    t = ObjectExtractionManager(
+        MYSQLProjectDatabaseConnector(),
+        MYSQLLabelDatabaseConnector(),
+        MYSQLLabellerDatabaseConnector(),
+        MYSQLImageObjectDatabaseConnector_bb(),
+        ObjectExtractionService(MYSQLImageClassMeasureDatabaseConnector(), MYSQLLabellerDatabaseConnector())
+    )
+    t.get_objects('66', 'plane', demo=False)
